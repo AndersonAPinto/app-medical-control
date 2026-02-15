@@ -109,7 +109,7 @@ export default function EditMedicationScreen() {
             { text: "Cancelar", style: "cancel" },
             {
               text: "Adicionar",
-              onPress: (val) => {
+              onPress: (val: string | undefined) => {
                 const add = parseInt(val || "0", 10);
                 if (add > 0) setCurrentStock(String(current + add));
               },
