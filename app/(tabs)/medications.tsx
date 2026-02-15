@@ -161,6 +161,7 @@ export default function MedicationsScreen() {
   const historyQuery = useQuery<HistoryEntry[]>({
     queryKey: ["/api/schedules/history"],
     enabled: activeTab === "historico",
+    staleTime: 0,
   });
 
   const deleteMutation = useMutation({

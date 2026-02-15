@@ -7,6 +7,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/lib/auth-context";
+import { ThemeProvider } from "@/lib/theme-context";
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 
 SplashScreen.preventAutoHideAsync();
@@ -36,6 +37,15 @@ function RootLayoutNav() {
           headerTintColor: "#0D9488",
         }}
       />
+      <Stack.Screen
+        name="edit-profile"
+        options={{
+          presentation: "modal",
+          headerShown: true,
+          headerTitle: "Editar Perfil",
+          headerTintColor: "#0D9488",
+        }}
+      />
       <Stack.Screen name="connections" />
     </Stack>
   );
@@ -62,9 +72,11 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView>
           <KeyboardProvider>
-            <AuthProvider>
-              <RootLayoutNav />
-            </AuthProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <RootLayoutNav />
+              </AuthProvider>
+            </ThemeProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
