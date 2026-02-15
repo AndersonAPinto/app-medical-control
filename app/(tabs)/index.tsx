@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface Medication {
@@ -37,36 +38,36 @@ interface Schedule {
   confirmedAt: number | null;
 }
 
-function MedicationCard({ med, onConfirmDose }: { med: Medication; onConfirmDose: (med: Medication) => void }) {
+function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onConfirmDose: (med: Medication) => void; colors: typeof Colors.light }) {
   const isLowStock = med.currentStock <= med.alertThreshold;
   const isOutOfStock = med.currentStock === 0;
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.medCard, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.medCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }, pressed && styles.cardPressed]}
       onPress={() => {}}
     >
       <View style={styles.medCardLeft}>
-        <View style={[styles.medIcon, isOutOfStock && styles.medIconDanger, isLowStock && !isOutOfStock && styles.medIconWarning]}>
+        <View style={[styles.medIcon, { backgroundColor: colors.tintLight }, isOutOfStock && { backgroundColor: colors.dangerLight }, isLowStock && !isOutOfStock && { backgroundColor: colors.warningLight }]}>
           <Ionicons
             name="medical"
             size={22}
-            color={isOutOfStock ? Colors.light.danger : isLowStock ? Colors.light.warning : Colors.light.tint}
+            color={isOutOfStock ? colors.danger : isLowStock ? colors.warning : colors.tint}
           />
         </View>
         <View style={styles.medInfo}>
-          <Text style={styles.medName}>{med.name}</Text>
-          <Text style={styles.medDosage}>{med.dosage}</Text>
+          <Text style={[styles.medName, { color: colors.text }]}>{med.name}</Text>
+          <Text style={[styles.medDosage, { color: colors.textSecondary }]}>{med.dosage}</Text>
           <View style={styles.medMeta}>
-            <Ionicons name="time-outline" size={12} color={Colors.light.textSecondary} />
-            <Text style={styles.medMetaText}>A cada {med.intervalInHours}h</Text>
-            <View style={styles.metaDot} />
+            <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+            <Text style={[styles.medMetaText, { color: colors.textSecondary }]}>A cada {med.intervalInHours}h</Text>
+            <View style={[styles.metaDot, { backgroundColor: colors.textSecondary }]} />
             <Ionicons
               name="cube-outline"
               size={12}
-              color={isLowStock ? Colors.light.warning : Colors.light.textSecondary}
+              color={isLowStock ? colors.warning : colors.textSecondary}
             />
-            <Text style={[styles.medMetaText, isLowStock && styles.metaWarning]}>
+            <Text style={[styles.medMetaText, { color: colors.textSecondary }, isLowStock && { color: colors.warning, fontFamily: "Inter_600SemiBold" }]}>
               {med.currentStock} un.
             </Text>
           </View>
@@ -74,7 +75,7 @@ function MedicationCard({ med, onConfirmDose }: { med: Medication; onConfirmDose
       </View>
 
       <Pressable
-        style={({ pressed }) => [styles.confirmBtn, pressed && styles.confirmBtnPressed]}
+        style={({ pressed }) => [styles.confirmBtn, { backgroundColor: colors.success }, pressed && styles.confirmBtnPressed]}
         onPress={() => onConfirmDose(med)}
       >
         <Ionicons name="checkmark" size={22} color="#fff" />
@@ -86,6 +87,8 @@ function MedicationCard({ med, onConfirmDose }: { med: Medication; onConfirmDose
 export default function DashboardScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
+  const colors = isDark ? Colors.dark : Colors.light;
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
@@ -124,7 +127,7 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
         colors={[Colors.palette.teal600, Colors.palette.teal500]}
         style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 16 }]}
@@ -154,41 +157,41 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{medications.length}</Text>
-          <Text style={styles.statLabel}>Remedios</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+          <Text style={[styles.statValue, { color: colors.text }]}>{medications.length}</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Remedios</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Colors.light.success }]}>{medications.filter(m => m.currentStock > m.alertThreshold).length}</Text>
-          <Text style={styles.statLabel}>Estoque OK</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+          <Text style={[styles.statValue, { color: colors.success }]}>{medications.filter(m => m.currentStock > m.alertThreshold).length}</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Estoque OK</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Colors.light.warning }]}>{lowStockMeds.length + outOfStockMeds.length}</Text>
-          <Text style={styles.statLabel}>Alertas</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+          <Text style={[styles.statValue, { color: colors.warning }]}>{lowStockMeds.length + outOfStockMeds.length}</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Alertas</Text>
         </View>
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Seus Remedios</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Seus Remedios</Text>
         <Pressable
-          style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.tintLight }, pressed && { opacity: 0.7 }]}
           onPress={() => router.push("/add-medication")}
         >
-          <Ionicons name="add" size={22} color={Colors.light.tint} />
+          <Ionicons name="add" size={22} color={colors.tint} />
         </Pressable>
       </View>
 
       {medsQuery.isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.tint} />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       ) : medications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="medkit-outline" size={56} color={Colors.light.border} />
-          <Text style={styles.emptyTitle}>Nenhum remedio cadastrado</Text>
-          <Text style={styles.emptyText}>Adicione seu primeiro medicamento</Text>
+          <Ionicons name="medkit-outline" size={56} color={colors.border} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum remedio cadastrado</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Adicione seu primeiro medicamento</Text>
           <Pressable
-            style={({ pressed }) => [styles.emptyBtn, pressed && styles.cardPressed]}
+            style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.tint }, pressed && styles.cardPressed]}
             onPress={() => router.push("/add-medication")}
           >
             <Ionicons name="add" size={20} color="#fff" />
@@ -200,7 +203,7 @@ export default function DashboardScreen() {
           data={medications}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <MedicationCard med={item} onConfirmDose={(med) => confirmMutation.mutate(med)} />
+            <MedicationCard med={item} onConfirmDose={(med) => confirmMutation.mutate(med)} colors={colors} />
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -208,7 +211,7 @@ export default function DashboardScreen() {
             <RefreshControl
               refreshing={medsQuery.isFetching}
               onRefresh={() => medsQuery.refetch()}
-              tintColor={Colors.light.tint}
+              tintColor={colors.tint}
             />
           }
         />
@@ -220,7 +223,6 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   header: {
     paddingBottom: 20,
@@ -278,11 +280,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: Colors.light.surface,
     borderRadius: 14,
     padding: 14,
     alignItems: "center",
-    shadowColor: Colors.light.cardShadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -291,12 +291,10 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 22,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
   },
   statLabel: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
     marginTop: 2,
   },
   sectionHeader: {
@@ -310,13 +308,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
   },
   addBtn: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -326,13 +322,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   medCard: {
-    backgroundColor: Colors.light.surface,
     borderRadius: 16,
     padding: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: Colors.light.cardShadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -352,15 +346,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 13,
-    backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
-  },
-  medIconDanger: {
-    backgroundColor: Colors.light.dangerLight,
-  },
-  medIconWarning: {
-    backgroundColor: Colors.light.warningLight,
   },
   medInfo: {
     flex: 1,
@@ -368,12 +355,10 @@ const styles = StyleSheet.create({
   medName: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
   },
   medDosage: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
     marginTop: 1,
   },
   medMeta: {
@@ -385,24 +370,17 @@ const styles = StyleSheet.create({
   medMetaText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
   },
   metaDot: {
     width: 3,
     height: 3,
     borderRadius: 2,
-    backgroundColor: Colors.light.textSecondary,
     marginHorizontal: 2,
-  },
-  metaWarning: {
-    color: Colors.light.warning,
-    fontFamily: "Inter_600SemiBold",
   },
   confirmBtn: {
     width: 44,
     height: 44,
     borderRadius: 13,
-    backgroundColor: Colors.light.success,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -425,19 +403,16 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 17,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
     marginTop: 8,
   },
   emptyText: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
     textAlign: "center" as const,
   },
   emptyBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.tint,
     borderRadius: 14,
     paddingHorizontal: 20,
     paddingVertical: 12,

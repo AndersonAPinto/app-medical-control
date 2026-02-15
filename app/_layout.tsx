@@ -7,12 +7,16 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/lib/auth-context";
-import { ThemeProvider } from "@/lib/theme-context";
+import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
+import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
+  const { isDark } = useTheme();
+  const colors = isDark ? Colors.dark : Colors.light;
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
@@ -25,7 +29,9 @@ function RootLayoutNav() {
           presentation: "modal",
           headerShown: true,
           headerTitle: "Novo Medicamento",
-          headerTintColor: "#0D9488",
+          headerTintColor: colors.tint,
+          headerStyle: { backgroundColor: colors.surface },
+          headerTitleStyle: { color: colors.text },
         }}
       />
       <Stack.Screen
@@ -34,7 +40,9 @@ function RootLayoutNav() {
           presentation: "modal",
           headerShown: true,
           headerTitle: "Editar Medicamento",
-          headerTintColor: "#0D9488",
+          headerTintColor: colors.tint,
+          headerStyle: { backgroundColor: colors.surface },
+          headerTitleStyle: { color: colors.text },
         }}
       />
       <Stack.Screen
@@ -43,7 +51,9 @@ function RootLayoutNav() {
           presentation: "modal",
           headerShown: true,
           headerTitle: "Editar Perfil",
-          headerTintColor: "#0D9488",
+          headerTintColor: colors.tint,
+          headerStyle: { backgroundColor: colors.surface },
+          headerTitleStyle: { color: colors.text },
         }}
       />
       <Stack.Screen name="connections" />

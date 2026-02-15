@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 
 interface Connection {
   id: string;
@@ -50,6 +51,7 @@ function ConnectionItem({
   onAccept,
   deletingId,
   acceptingId,
+  colors,
 }: {
   item: Connection;
   userId: string | undefined;
@@ -57,27 +59,28 @@ function ConnectionItem({
   onAccept: (id: string) => void;
   deletingId: string | null;
   acceptingId: string | null;
+  colors: typeof Colors.light;
 }) {
   const isPending = item.status === "PENDING";
   const canAccept = isPending && item.dependentId === userId;
 
   return (
-    <View style={styles.connectionCard}>
-      <View style={styles.connectionAvatar}>
-        <Text style={styles.connectionAvatarText}>
+    <View style={[styles.connectionCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+      <View style={[styles.connectionAvatar, { backgroundColor: colors.tintLight }]}>
+        <Text style={[styles.connectionAvatarText, { color: colors.tint }]}>
           {item.linkedName?.charAt(0)?.toUpperCase() || "?"}
         </Text>
       </View>
       <View style={styles.connectionInfo}>
-        <Text style={styles.connectionName}>{item.linkedName}</Text>
-        <Text style={styles.connectionEmail}>{item.linkedEmail}</Text>
+        <Text style={[styles.connectionName, { color: colors.text }]}>{item.linkedName}</Text>
+        <Text style={[styles.connectionEmail, { color: colors.textSecondary }]}>{item.linkedEmail}</Text>
         <View style={styles.connectionMeta}>
-          <View style={[styles.statusBadge, isPending ? styles.statusPending : styles.statusAccepted]}>
-            <Text style={[styles.statusText, isPending ? styles.statusTextPending : styles.statusTextAccepted]}>
+          <View style={[styles.statusBadge, { backgroundColor: isPending ? colors.warningLight : colors.successLight }]}>
+            <Text style={[styles.statusText, { color: isPending ? colors.warning : colors.success }]}>
               {isPending ? "Pendente" : "Aceita"}
             </Text>
           </View>
-          <Text style={styles.roleText}>
+          <Text style={[styles.roleText, { color: colors.textSecondary }]}>
             {ROLE_LABELS[item.linkedRole] || item.linkedRole}
           </Text>
         </View>
@@ -91,9 +94,9 @@ function ConnectionItem({
             hitSlop={8}
           >
             {acceptingId === item.id ? (
-              <ActivityIndicator size={16} color={Colors.light.success} />
+              <ActivityIndicator size={16} color={colors.success} />
             ) : (
-              <Ionicons name="checkmark-circle" size={24} color={Colors.light.success} />
+              <Ionicons name="checkmark-circle" size={24} color={colors.success} />
             )}
           </Pressable>
         )}
@@ -104,9 +107,9 @@ function ConnectionItem({
           hitSlop={8}
         >
           {deletingId === item.id ? (
-            <ActivityIndicator size={16} color={Colors.light.danger} />
+            <ActivityIndicator size={16} color={colors.danger} />
           ) : (
-            <Ionicons name="trash-outline" size={20} color={Colors.light.danger} />
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
           )}
         </Pressable>
       </View>
@@ -117,6 +120,8 @@ function ConnectionItem({
 export default function ConnectionsScreen() {
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
+  const { isDark } = useTheme();
+  const colors = isDark ? Colors.dark : Colors.light;
   const [searchText, setSearchText] = useState("");
   const [searching, setSearching] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -273,6 +278,7 @@ export default function ConnectionsScreen() {
       onAccept={handleAccept}
       deletingId={deletingId}
       acceptingId={acceptingId}
+      colors={colors}
     />
   );
 
@@ -280,11 +286,11 @@ export default function ConnectionsScreen() {
     if (connectionsQuery.isLoading) return null;
     return (
       <View style={styles.emptyContainer}>
-        <View style={styles.emptyIcon}>
-          <Ionicons name="people-outline" size={40} color={Colors.light.textSecondary} />
+        <View style={[styles.emptyIcon, { backgroundColor: colors.inputBg }]}>
+          <Ionicons name="people-outline" size={40} color={colors.textSecondary} />
         </View>
-        <Text style={styles.emptyTitle}>Nenhuma conexao</Text>
-        <Text style={styles.emptySubtitle}>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma conexao</Text>
+        <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
           Busque por ID ou email para adicionar uma conexao
         </Text>
       </View>
@@ -292,25 +298,25 @@ export default function ConnectionsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 8 }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 8, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
+          <Pressable onPress={() => router.back()} hitSlop={12} style={[styles.backBtn, { backgroundColor: colors.inputBg }]}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Conexoes</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Conexoes</Text>
           <View style={{ width: 36 }} />
         </View>
       </View>
 
-      <View style={styles.searchSection}>
+      <View style={[styles.searchSection, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.searchRow}>
-          <View style={styles.searchInputWrapper}>
-            <Ionicons name="search" size={18} color={Colors.light.textSecondary} />
+          <View style={[styles.searchInputWrapper, { backgroundColor: colors.inputBg }]}>
+            <Ionicons name="search" size={18} color={colors.textSecondary} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder="Buscar por ID ou email..."
-              placeholderTextColor={Colors.light.textSecondary}
+              placeholderTextColor={colors.textSecondary}
               value={searchText}
               onChangeText={setSearchText}
               autoCapitalize="none"
@@ -323,6 +329,7 @@ export default function ConnectionsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.searchBtn,
+              { backgroundColor: colors.tint },
               pressed && { opacity: 0.85 },
               (searching || addMutation.isPending) && { opacity: 0.6 },
             ]}
@@ -353,18 +360,18 @@ export default function ConnectionsScreen() {
           <RefreshControl
             refreshing={connectionsQuery.isRefetching}
             onRefresh={() => connectionsQuery.refetch()}
-            tintColor={Colors.light.tint}
-            colors={[Colors.light.tint]}
+            tintColor={colors.tint}
+            colors={[colors.tint]}
           />
         }
         ListHeaderComponent={
           connectionsQuery.isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.light.tint} />
-              <Text style={styles.loadingText}>Carregando conexoes...</Text>
+              <ActivityIndicator size="large" color={colors.tint} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando conexoes...</Text>
             </View>
           ) : connections.length > 0 ? (
-            <Text style={styles.sectionLabel}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
               {connections.length} {connections.length === 1 ? "conexao" : "conexoes"}
             </Text>
           ) : null
@@ -377,14 +384,11 @@ export default function ConnectionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 12,
-    backgroundColor: Colors.light.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
   headerRow: {
     flexDirection: "row",
@@ -395,21 +399,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: Colors.light.inputBg,
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
   },
   searchSection: {
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: Colors.light.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
   searchRow: {
     flexDirection: "row",
@@ -419,7 +419,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.inputBg,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,
@@ -429,13 +428,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.text,
   },
   searchBtn: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: Colors.light.tint,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -445,7 +442,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.textSecondary,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
     marginBottom: 12,
@@ -454,11 +450,9 @@ const styles = StyleSheet.create({
   connectionCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.surface,
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
-    shadowColor: Colors.light.cardShadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -469,14 +463,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
   },
   connectionAvatarText: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.tint,
   },
   connectionInfo: {
     flex: 1,
@@ -484,12 +476,10 @@ const styles = StyleSheet.create({
   connectionName: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
   },
   connectionEmail: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
     marginTop: 1,
   },
   connectionMeta: {
@@ -503,26 +493,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  statusPending: {
-    backgroundColor: Colors.light.warningLight,
-  },
-  statusAccepted: {
-    backgroundColor: Colors.light.successLight,
-  },
   statusText: {
     fontSize: 10,
     fontFamily: "Inter_700Bold",
   },
-  statusTextPending: {
-    color: Colors.light.warning,
-  },
-  statusTextAccepted: {
-    color: Colors.light.success,
-  },
   roleText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
   },
   connectionActions: {
     flexDirection: "row",
@@ -551,7 +528,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 24,
-    backgroundColor: Colors.light.inputBg,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
@@ -559,13 +535,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
     marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
     textAlign: "center",
     lineHeight: 20,
   },
@@ -578,6 +552,5 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
   },
 });

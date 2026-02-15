@@ -18,6 +18,7 @@ import { useMutation } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useTheme } from "@/lib/theme-context";
 
 const intervals = [
   { label: "4h", value: 4 },
@@ -29,6 +30,8 @@ const intervals = [
 
 export default function AddMedicationScreen() {
   const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
+  const colors = isDark ? Colors.dark : Colors.light;
   const [name, setName] = useState("");
   const [dosage, setDosage] = useState("");
   const [currentStock, setCurrentStock] = useState("");
@@ -70,7 +73,7 @@ export default function AddMedicationScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={90}
     >
@@ -80,48 +83,52 @@ export default function AddMedicationScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.iconHeader}>
-          <View style={styles.bigIcon}>
-            <Ionicons name="medical" size={36} color={Colors.light.tint} />
+          <View style={[styles.bigIcon, { backgroundColor: colors.tintLight }]}>
+            <Ionicons name="medical" size={36} color={colors.tint} />
           </View>
-          <Text style={styles.subtitle}>Adicione os detalhes do medicamento</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Adicione os detalhes do medicamento</Text>
         </View>
 
-        <Text style={styles.label}>Nome do medicamento</Text>
-        <View style={styles.inputWrapper}>
-          <Ionicons name="medkit-outline" size={18} color={Colors.light.textSecondary} style={styles.inputIcon} />
+        <Text style={[styles.label, { color: colors.text }]}>Nome do medicamento</Text>
+        <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="medkit-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: colors.text }]}
             placeholder="Ex: Dipirona"
-            placeholderTextColor={Colors.light.textSecondary}
+            placeholderTextColor={colors.textSecondary}
             value={name}
             onChangeText={setName}
           />
         </View>
 
-        <Text style={styles.label}>Dosagem</Text>
-        <View style={styles.inputWrapper}>
-          <Ionicons name="flask-outline" size={18} color={Colors.light.textSecondary} style={styles.inputIcon} />
+        <Text style={[styles.label, { color: colors.text }]}>Dosagem</Text>
+        <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="flask-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: colors.text }]}
             placeholder="Ex: 500mg, 1 comprimido"
-            placeholderTextColor={Colors.light.textSecondary}
+            placeholderTextColor={colors.textSecondary}
             value={dosage}
             onChangeText={setDosage}
           />
         </View>
 
-        <Text style={styles.label}>Intervalo entre doses</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Intervalo entre doses</Text>
         <View style={styles.intervalRow}>
           {intervals.map((i) => (
             <Pressable
               key={i.value}
-              style={[styles.intervalChip, intervalInHours === i.value && styles.intervalChipActive]}
+              style={[
+                styles.intervalChip,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                intervalInHours === i.value && { borderColor: colors.tint, backgroundColor: colors.tintLight },
+              ]}
               onPress={() => {
                 Haptics.selectionAsync();
                 setIntervalInHours(i.value);
               }}
             >
-              <Text style={[styles.intervalText, intervalInHours === i.value && styles.intervalTextActive]}>
+              <Text style={[styles.intervalText, { color: colors.textSecondary }, intervalInHours === i.value && { color: colors.tint }]}>
                 {i.label}
               </Text>
             </Pressable>
@@ -130,13 +137,13 @@ export default function AddMedicationScreen() {
 
         <View style={styles.stockRow}>
           <View style={styles.stockField}>
-            <Text style={styles.label}>Estoque atual</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="cube-outline" size={18} color={Colors.light.textSecondary} style={styles.inputIcon} />
+            <Text style={[styles.label, { color: colors.text }]}>Estoque atual</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="cube-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 placeholder="0"
-                placeholderTextColor={Colors.light.textSecondary}
+                placeholderTextColor={colors.textSecondary}
                 value={currentStock}
                 onChangeText={setCurrentStock}
                 keyboardType="number-pad"
@@ -145,13 +152,13 @@ export default function AddMedicationScreen() {
           </View>
 
           <View style={styles.stockField}>
-            <Text style={styles.label}>Alerta em</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="notifications-outline" size={18} color={Colors.light.textSecondary} style={styles.inputIcon} />
+            <Text style={[styles.label, { color: colors.text }]}>Alerta em</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 placeholder="5"
-                placeholderTextColor={Colors.light.textSecondary}
+                placeholderTextColor={colors.textSecondary}
                 value={alertThreshold}
                 onChangeText={setAlertThreshold}
                 keyboardType="number-pad"
@@ -160,9 +167,9 @@ export default function AddMedicationScreen() {
           </View>
         </View>
 
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={18} color={Colors.light.tint} />
-          <Text style={styles.infoText}>
+        <View style={[styles.infoBox, { backgroundColor: colors.tintLight }]}>
+          <Ionicons name="information-circle-outline" size={18} color={colors.tint} />
+          <Text style={[styles.infoText, { color: colors.tint }]}>
             Voce sera alertado quando o estoque atingir {alertThreshold || "5"} unidades
           </Text>
         </View>
@@ -170,6 +177,7 @@ export default function AddMedicationScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.saveBtn,
+            { backgroundColor: colors.tint },
             pressed && styles.saveBtnPressed,
             createMutation.isPending && styles.saveBtnDisabled,
           ]}
@@ -193,7 +201,6 @@ export default function AddMedicationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   content: {
     padding: 20,
@@ -206,7 +213,6 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 22,
-    backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 8,
@@ -214,24 +220,20 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
   },
   label: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
     marginBottom: 6,
     marginTop: 12,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 52,
     borderWidth: 1,
-    borderColor: Colors.light.border,
   },
   inputIcon: {
     marginRight: 10,
@@ -240,7 +242,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.text,
   },
   intervalRow: {
     flexDirection: "row",
@@ -251,23 +252,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.light.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.light.border,
-  },
-  intervalChipActive: {
-    borderColor: Colors.light.tint,
-    backgroundColor: Colors.light.tintLight,
   },
   intervalText: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.textSecondary,
-  },
-  intervalTextActive: {
-    color: Colors.light.tint,
   },
   stockRow: {
     flexDirection: "row",
@@ -279,7 +270,6 @@ const styles = StyleSheet.create({
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.tintLight,
     borderRadius: 12,
     padding: 12,
     marginTop: 16,
@@ -289,13 +279,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.tint,
   },
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.light.tint,
     borderRadius: 14,
     height: 52,
     marginTop: 24,

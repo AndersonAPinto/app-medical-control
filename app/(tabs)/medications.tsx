@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useTheme } from "@/lib/theme-context";
 
 interface Medication {
   id: string;
@@ -38,7 +39,7 @@ interface HistoryEntry {
   medicationDosage: string;
 }
 
-function MedicationDetailCard({ med, onDelete, onEdit }: { med: Medication; onDelete: (id: string) => void; onEdit: (id: string) => void }) {
+function MedicationDetailCard({ med, onDelete, onEdit, colors }: { med: Medication; onDelete: (id: string) => void; onEdit: (id: string) => void; colors: typeof Colors.light }) {
   const isLowStock = med.currentStock <= med.alertThreshold;
   const isOutOfStock = med.currentStock === 0;
   const stockPercentage = med.alertThreshold > 0
@@ -51,19 +52,19 @@ function MedicationDetailCard({ med, onDelete, onEdit }: { med: Medication; onDe
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onEdit(med.id);
       }}
-      style={({ pressed }) => [styles.detailCard, pressed && { opacity: 0.9 }]}
+      style={({ pressed }) => [styles.detailCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }, pressed && { opacity: 0.9 }]}
     >
       <View style={styles.detailHeader}>
-        <View style={[styles.medIcon, isOutOfStock && styles.medIconDanger, isLowStock && !isOutOfStock && styles.medIconWarning]}>
+        <View style={[styles.medIcon, { backgroundColor: colors.tintLight }, isOutOfStock && { backgroundColor: colors.dangerLight }, isLowStock && !isOutOfStock && { backgroundColor: colors.warningLight }]}>
           <Ionicons
             name="medical"
             size={22}
-            color={isOutOfStock ? Colors.light.danger : isLowStock ? Colors.light.warning : Colors.light.tint}
+            color={isOutOfStock ? colors.danger : isLowStock ? colors.warning : colors.tint}
           />
         </View>
         <View style={styles.detailInfo}>
-          <Text style={styles.detailName}>{med.name}</Text>
-          <Text style={styles.detailDosage}>{med.dosage}</Text>
+          <Text style={[styles.detailName, { color: colors.text }]}>{med.name}</Text>
+          <Text style={[styles.detailDosage, { color: colors.textSecondary }]}>{med.dosage}</Text>
         </View>
         <Pressable
           onPress={() => {
@@ -78,42 +79,42 @@ function MedicationDetailCard({ med, onDelete, onEdit }: { med: Medication; onDe
             );
           }}
         >
-          <Ionicons name="trash-outline" size={20} color={Colors.light.danger} />
+          <Ionicons name="trash-outline" size={20} color={colors.danger} />
         </Pressable>
       </View>
 
       <View style={styles.detailStats}>
         <View style={styles.detailStat}>
-          <Ionicons name="time-outline" size={16} color={Colors.light.textSecondary} />
-          <Text style={styles.detailStatText}>A cada {med.intervalInHours}h</Text>
+          <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+          <Text style={[styles.detailStatText, { color: colors.textSecondary }]}>A cada {med.intervalInHours}h</Text>
         </View>
         <View style={styles.detailStat}>
-          <Ionicons name="cube-outline" size={16} color={Colors.light.textSecondary} />
-          <Text style={styles.detailStatText}>{med.currentStock} unidades</Text>
+          <Ionicons name="cube-outline" size={16} color={colors.textSecondary} />
+          <Text style={[styles.detailStatText, { color: colors.textSecondary }]}>{med.currentStock} unidades</Text>
         </View>
         <View style={styles.detailStat}>
-          <Ionicons name="notifications-outline" size={16} color={Colors.light.textSecondary} />
-          <Text style={styles.detailStatText}>Alerta: {med.alertThreshold} un.</Text>
+          <Ionicons name="notifications-outline" size={16} color={colors.textSecondary} />
+          <Text style={[styles.detailStatText, { color: colors.textSecondary }]}>Alerta: {med.alertThreshold} un.</Text>
         </View>
       </View>
 
       <View style={styles.stockBarContainer}>
-        <View style={styles.stockBarBg}>
+        <View style={[styles.stockBarBg, { backgroundColor: colors.inputBg }]}>
           <View
             style={[
               styles.stockBarFill,
               {
                 width: `${stockPercentage}%`,
                 backgroundColor: isOutOfStock
-                  ? Colors.light.danger
+                  ? colors.danger
                   : isLowStock
-                  ? Colors.light.warning
-                  : Colors.light.success,
+                  ? colors.warning
+                  : colors.success,
               },
             ]}
           />
         </View>
-        <Text style={[styles.stockLabel, isLowStock && styles.stockLabelWarning]}>
+        <Text style={[styles.stockLabel, { color: colors.success }, isLowStock && { color: colors.warning }]}>
           {isOutOfStock ? "Sem estoque" : isLowStock ? "Estoque baixo" : "Estoque adequado"}
         </Text>
       </View>
@@ -121,7 +122,7 @@ function MedicationDetailCard({ med, onDelete, onEdit }: { med: Medication; onDe
   );
 }
 
-function HistoryItem({ entry }: { entry: HistoryEntry }) {
+function HistoryItem({ entry, colors }: { entry: HistoryEntry; colors: typeof Colors.light }) {
   const confirmedDate = entry.confirmedAt ? new Date(entry.confirmedAt) : new Date(entry.timeMillis);
   const formattedDate = confirmedDate.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -134,17 +135,17 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
   });
 
   return (
-    <View style={styles.historyCard}>
-      <View style={styles.historyIcon}>
-        <Ionicons name="checkmark-circle" size={22} color={Colors.light.success} />
+    <View style={[styles.historyCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+      <View style={[styles.historyIcon, { backgroundColor: colors.successLight }]}>
+        <Ionicons name="checkmark-circle" size={22} color={colors.success} />
       </View>
       <View style={styles.historyInfo}>
-        <Text style={styles.historyName}>{entry.medicationName}</Text>
-        <Text style={styles.historyDosage}>{entry.medicationDosage}</Text>
+        <Text style={[styles.historyName, { color: colors.text }]}>{entry.medicationName}</Text>
+        <Text style={[styles.historyDosage, { color: colors.textSecondary }]}>{entry.medicationDosage}</Text>
       </View>
       <View style={styles.historyTime}>
-        <Text style={styles.historyDate}>{formattedDate}</Text>
-        <Text style={styles.historyHour}>{formattedTime}</Text>
+        <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{formattedDate}</Text>
+        <Text style={[styles.historyHour, { color: colors.text }]}>{formattedTime}</Text>
       </View>
     </View>
   );
@@ -153,6 +154,8 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 export default function MedicationsScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<"remedios" | "historico">("remedios");
+  const { isDark } = useTheme();
+  const colors = isDark ? Colors.dark : Colors.light;
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
@@ -178,38 +181,38 @@ export default function MedicationsScreen() {
   const history = historyQuery.data || [];
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 8 }]}>
-        <Text style={styles.headerTitle}>Medicamentos</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 8, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Medicamentos</Text>
         <Pressable
-          style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.tintLight }, pressed && { opacity: 0.7 }]}
           onPress={() => router.push("/add-medication")}
         >
-          <Ionicons name="add" size={24} color={Colors.light.tint} />
+          <Ionicons name="add" size={24} color={colors.tint} />
         </Pressable>
       </View>
 
-      <View style={styles.segmentContainer}>
-        <View style={styles.segmentControl}>
+      <View style={[styles.segmentContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.segmentControl, { backgroundColor: colors.inputBg }]}>
           <Pressable
-            style={[styles.segmentBtn, activeTab === "remedios" && styles.segmentBtnActive]}
+            style={[styles.segmentBtn, activeTab === "remedios" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
             onPress={() => {
               Haptics.selectionAsync();
               setActiveTab("remedios");
             }}
           >
-            <Text style={[styles.segmentText, activeTab === "remedios" && styles.segmentTextActive]}>
+            <Text style={[styles.segmentText, { color: colors.textSecondary }, activeTab === "remedios" && [styles.segmentTextActive, { color: colors.text }]]}>
               Remedios
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.segmentBtn, activeTab === "historico" && styles.segmentBtnActive]}
+            style={[styles.segmentBtn, activeTab === "historico" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
             onPress={() => {
               Haptics.selectionAsync();
               setActiveTab("historico");
             }}
           >
-            <Text style={[styles.segmentText, activeTab === "historico" && styles.segmentTextActive]}>
+            <Text style={[styles.segmentText, { color: colors.textSecondary }, activeTab === "historico" && [styles.segmentTextActive, { color: colors.text }]]}>
               Historico
             </Text>
           </Pressable>
@@ -220,13 +223,13 @@ export default function MedicationsScreen() {
         <>
           {medsQuery.isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.light.tint} />
+              <ActivityIndicator size="large" color={colors.tint} />
             </View>
           ) : medications.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="medkit-outline" size={56} color={Colors.light.border} />
-              <Text style={styles.emptyTitle}>Lista vazia</Text>
-              <Text style={styles.emptyText}>Cadastre seus medicamentos para acompanhar estoque e horarios</Text>
+              <Ionicons name="medkit-outline" size={56} color={colors.border} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>Lista vazia</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Cadastre seus medicamentos para acompanhar estoque e horarios</Text>
             </View>
           ) : (
             <FlatList
@@ -235,6 +238,7 @@ export default function MedicationsScreen() {
               renderItem={({ item }) => (
                 <MedicationDetailCard
                   med={item}
+                  colors={colors}
                   onDelete={(id) => deleteMutation.mutate(id)}
                   onEdit={(id) => router.push(`/edit-medication?id=${id}`)}
                 />
@@ -245,7 +249,7 @@ export default function MedicationsScreen() {
                 <RefreshControl
                   refreshing={medsQuery.isFetching}
                   onRefresh={() => medsQuery.refetch()}
-                  tintColor={Colors.light.tint}
+                  tintColor={colors.tint}
                 />
               }
             />
@@ -255,26 +259,26 @@ export default function MedicationsScreen() {
         <>
           {historyQuery.isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.light.tint} />
+              <ActivityIndicator size="large" color={colors.tint} />
             </View>
           ) : history.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="time-outline" size={56} color={Colors.light.border} />
-              <Text style={styles.emptyTitle}>Nenhuma dose registrada</Text>
-              <Text style={styles.emptyText}>O historico de doses confirmadas aparecera aqui</Text>
+              <Ionicons name="time-outline" size={56} color={colors.border} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma dose registrada</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>O historico de doses confirmadas aparecera aqui</Text>
             </View>
           ) : (
             <FlatList
               data={history}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <HistoryItem entry={item} />}
+              renderItem={({ item }) => <HistoryItem entry={item} colors={colors} />}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
                   refreshing={historyQuery.isFetching}
                   onRefresh={() => historyQuery.refetch()}
-                  tintColor={Colors.light.tint}
+                  tintColor={colors.tint}
                 />
               }
             />
@@ -288,7 +292,6 @@ export default function MedicationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   header: {
     flexDirection: "row",
@@ -296,31 +299,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingBottom: 12,
-    backgroundColor: Colors.light.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
   headerTitle: {
     fontSize: 28,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
   },
   addBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
   },
   segmentContainer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: Colors.light.surface,
   },
   segmentControl: {
     flexDirection: "row",
-    backgroundColor: Colors.light.inputBg,
     borderRadius: 12,
     padding: 3,
   },
@@ -332,8 +329,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   segmentBtnActive: {
-    backgroundColor: Colors.light.surface,
-    shadowColor: Colors.light.cardShadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
     shadowRadius: 3,
@@ -342,11 +337,9 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
   },
   segmentTextActive: {
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
   },
   listContent: {
     padding: 20,
@@ -354,10 +347,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   detailCard: {
-    backgroundColor: Colors.light.surface,
     borderRadius: 18,
     padding: 16,
-    shadowColor: Colors.light.cardShadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -372,15 +363,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 13,
-    backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
-  },
-  medIconDanger: {
-    backgroundColor: Colors.light.dangerLight,
-  },
-  medIconWarning: {
-    backgroundColor: Colors.light.warningLight,
   },
   detailInfo: {
     flex: 1,
@@ -388,12 +372,10 @@ const styles = StyleSheet.create({
   detailName: {
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
   },
   detailDosage: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
     marginTop: 1,
   },
   detailStats: {
@@ -409,7 +391,6 @@ const styles = StyleSheet.create({
   detailStatText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
   },
   stockBarContainer: {
     marginTop: 14,
@@ -417,7 +398,6 @@ const styles = StyleSheet.create({
   stockBarBg: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.light.inputBg,
     overflow: "hidden",
   },
   stockBarFill: {
@@ -427,11 +407,7 @@ const styles = StyleSheet.create({
   stockLabel: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
-    color: Colors.light.success,
     marginTop: 6,
-  },
-  stockLabelWarning: {
-    color: Colors.light.warning,
   },
   loadingContainer: {
     flex: 1,
@@ -448,23 +424,19 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 17,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
     marginTop: 8,
   },
   emptyText: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
     textAlign: "center" as const,
   },
   historyCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.surface,
     borderRadius: 14,
     padding: 14,
     gap: 12,
-    shadowColor: Colors.light.cardShadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
     shadowRadius: 4,
@@ -474,7 +446,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: Colors.light.successLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -484,12 +455,10 @@ const styles = StyleSheet.create({
   historyName: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
   },
   historyDosage: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
     marginTop: 1,
   },
   historyTime: {
@@ -498,12 +467,10 @@ const styles = StyleSheet.create({
   historyDate: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
   },
   historyHour: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
     marginTop: 2,
   },
 });
