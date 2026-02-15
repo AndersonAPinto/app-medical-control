@@ -11,7 +11,7 @@ import {
   connections,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/neon-serverless";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import ws from "ws";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 
@@ -28,11 +28,15 @@ export interface IStorage {
   createUser(user: InsertUser & { password: string }): Promise<User>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
+  updateUser(id: string, data: Partial<Pick<User, "name" | "email" | "role" | "planType">>): Promise<User>;
   getMedicationsByOwner(ownerId: string): Promise<Medication[]>;
+  getMedicationById(id: string): Promise<Medication | undefined>;
   createMedication(med: InsertMedication & { ownerId: string }): Promise<Medication>;
+  updateMedication(id: string, ownerId: string, data: Partial<Pick<Medication, "name" | "dosage" | "currentStock" | "alertThreshold" | "intervalInHours">>): Promise<Medication>;
   deleteMedication(id: string, ownerId: string): Promise<void>;
   updateMedicationStock(id: string, newStock: number): Promise<void>;
   getSchedulesByOwner(ownerId: string): Promise<DoseSchedule[]>;
+  getConfirmedSchedulesByOwner(ownerId: string): Promise<DoseSchedule[]>;
   createSchedule(schedule: Omit<DoseSchedule, "id">): Promise<DoseSchedule>;
   updateScheduleStatus(id: string, status: string, confirmedAt?: number): Promise<void>;
   createConnection(masterId: string, dependentId: string): Promise<Connection>;
@@ -40,6 +44,7 @@ export interface IStorage {
   getConnectionsByDependent(dependentId: string): Promise<Connection[]>;
   getConnectionCount(masterId: string): Promise<number>;
   acceptConnection(id: string): Promise<void>;
+  deleteConnection(id: string): Promise<void>;
   getDependentsForMaster(masterId: string): Promise<User[]>;
 }
 
@@ -59,13 +64,28 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: string, data: Partial<Pick<User, "name" | "email" | "role" | "planType">>): Promise<User> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
   async getMedicationsByOwner(ownerId: string): Promise<Medication[]> {
     return db.select().from(medications).where(eq(medications.ownerId, ownerId));
+  }
+
+  async getMedicationById(id: string): Promise<Medication | undefined> {
+    const [med] = await db.select().from(medications).where(eq(medications.id, id));
+    return med;
   }
 
   async createMedication(med: InsertMedication & { ownerId: string }): Promise<Medication> {
     const [created] = await db.insert(medications).values(med).returning();
     return created;
+  }
+
+  async updateMedication(id: string, ownerId: string, data: Partial<Pick<Medication, "name" | "dosage" | "currentStock" | "alertThreshold" | "intervalInHours">>): Promise<Medication> {
+    const [updated] = await db.update(medications).set(data).where(and(eq(medications.id, id), eq(medications.ownerId, ownerId))).returning();
+    return updated;
   }
 
   async deleteMedication(id: string, ownerId: string): Promise<void> {
@@ -78,6 +98,12 @@ export class DatabaseStorage implements IStorage {
 
   async getSchedulesByOwner(ownerId: string): Promise<DoseSchedule[]> {
     return db.select().from(doseSchedules).where(eq(doseSchedules.ownerId, ownerId));
+  }
+
+  async getConfirmedSchedulesByOwner(ownerId: string): Promise<DoseSchedule[]> {
+    return db.select().from(doseSchedules)
+      .where(and(eq(doseSchedules.ownerId, ownerId), eq(doseSchedules.status, "TAKEN")))
+      .orderBy(desc(doseSchedules.confirmedAt));
   }
 
   async createSchedule(schedule: Omit<DoseSchedule, "id">): Promise<DoseSchedule> {
@@ -109,6 +135,10 @@ export class DatabaseStorage implements IStorage {
 
   async acceptConnection(id: string): Promise<void> {
     await db.update(connections).set({ status: "ACCEPTED" }).where(eq(connections.id, id));
+  }
+
+  async deleteConnection(id: string): Promise<void> {
+    await db.delete(connections).where(eq(connections.id, id));
   }
 
   async getDependentsForMaster(masterId: string): Promise<User[]> {

@@ -1,7 +1,15 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import { storage } from "./storage";
-import { insertUserSchema, loginSchema, insertMedicationSchema, insertConnectionSchema } from "@shared/schema";
+import {
+  insertUserSchema,
+  loginSchema,
+  updateProfileSchema,
+  updateRoleSchema,
+  insertMedicationSchema,
+  updateMedicationSchema,
+  insertConnectionSchema,
+} from "@shared/schema";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -111,12 +119,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(safeUser);
   });
 
+  app.patch("/api/auth/profile", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const parsed = updateProfileSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data" });
+      }
+
+      if (parsed.data.email) {
+        const existing = await storage.getUserByEmail(parsed.data.email);
+        if (existing && existing.id !== req.session.userId) {
+          return res.status(409).json({ message: "Email already in use" });
+        }
+      }
+
+      const updated = await storage.updateUser(req.session.userId!, parsed.data);
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/auth/role", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const parsed = updateRoleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      const updated = await storage.updateUser(req.session.userId!, { role: parsed.data.role });
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Update role error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/auth/upgrade", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const updated = await storage.updateUser(req.session.userId!, { planType: "PREMIUM" });
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Upgrade error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/users/search/:identifier", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { identifier } = req.params;
+      let user = await storage.getUserById(identifier);
+      if (!user) {
+        user = await storage.getUserByEmail(identifier);
+      }
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
+    } catch (error) {
+      console.error("Search user error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.get("/api/medications", requireAuth, async (req: Request, res: Response) => {
     try {
       const meds = await storage.getMedicationsByOwner(req.session.userId!);
       res.json(meds);
     } catch (error) {
       console.error("Get medications error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/medications/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const med = await storage.getMedicationById(req.params.id);
+      if (!med) {
+        return res.status(404).json({ message: "Medication not found" });
+      }
+      res.json(med);
+    } catch (error) {
+      console.error("Get medication error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
@@ -135,6 +223,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(med);
     } catch (error) {
       console.error("Create medication error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/medications/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const parsed = updateMedicationSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data" });
+      }
+
+      const updated = await storage.updateMedication(req.params.id, req.session.userId!, parsed.data);
+      if (!updated) {
+        return res.status(404).json({ message: "Medication not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Update medication error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
@@ -169,6 +275,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(schedules);
     } catch (error) {
       console.error("Get schedules error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/schedules/history", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const schedules = await storage.getConfirmedSchedulesByOwner(req.session.userId!);
+      const meds = await storage.getMedicationsByOwner(req.session.userId!);
+      const medMap = new Map(meds.map(m => [m.id, m]));
+
+      const enriched = schedules.map(s => ({
+        ...s,
+        medicationName: medMap.get(s.medId)?.name || "Remedio removido",
+        medicationDosage: medMap.get(s.medId)?.dosage || "",
+      }));
+
+      res.json(enriched);
+    } catch (error) {
+      console.error("Get history error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
@@ -216,8 +341,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const dep = await storage.getUserById(conn.dependentId);
           enriched.push({
             ...conn,
-            dependentName: dep?.name || "Unknown",
-            dependentEmail: dep?.email || "",
+            linkedName: dep?.name || "Unknown",
+            linkedEmail: dep?.email || "",
+            linkedRole: dep?.role || "",
           });
         }
         res.json(enriched);
@@ -228,8 +354,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const master = await storage.getUserById(conn.masterId);
           enriched.push({
             ...conn,
-            masterName: master?.name || "Unknown",
-            masterEmail: master?.email || "",
+            linkedName: master?.name || "Unknown",
+            linkedEmail: master?.email || "",
+            linkedRole: master?.role || "",
           });
         }
         res.json(enriched);
@@ -243,15 +370,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/connections", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (!user || user.role !== "MASTER") {
-        return res.status(403).json({ message: "Only MASTER users can add dependents" });
-      }
+      if (!user) return res.status(401).json({ message: "User not found" });
 
-      if (user.planType === "FREE") {
-        const count = await storage.getConnectionCount(req.session.userId!);
-        if (count >= 1) {
-          return res.status(403).json({ message: "FREE plan limited to 1 dependent. Upgrade to PREMIUM." });
-        }
+      if (user.role !== "MASTER") {
+        return res.status(403).json({ message: "Only MASTER users can add connections" });
       }
 
       const parsed = insertConnectionSchema.safeParse(req.body);
@@ -259,19 +381,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid data" });
       }
 
-      const dependent = await storage.getUserByEmail(parsed.data.dependentId);
-      if (!dependent) {
-        return res.status(404).json({ message: "User not found with that email" });
+      let target = await storage.getUserById(parsed.data.targetId);
+      if (!target) {
+        target = await storage.getUserByEmail(parsed.data.targetId);
+      }
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
       }
 
-      if (dependent.role !== "DEPENDENT") {
-        return res.status(400).json({ message: "Target user is not a DEPENDENT" });
+      if (target.id === req.session.userId) {
+        return res.status(400).json({ message: "Cannot connect to yourself" });
       }
 
-      const conn = await storage.createConnection(req.session.userId!, dependent.id);
-      res.status(201).json(conn);
+      if (user.planType === "FREE") {
+        const count = await storage.getConnectionCount(req.session.userId!);
+        if (count >= 1) {
+          return res.status(403).json({
+            message: "Plano FREE limitado a 1 conexao. Faca upgrade para PREMIUM.",
+            requiresUpgrade: true,
+          });
+        }
+      }
+
+      const conn = await storage.createConnection(req.session.userId!, target.id);
+      res.status(201).json({
+        ...conn,
+        linkedName: target.name,
+        linkedEmail: target.email,
+        linkedRole: target.role,
+      });
     } catch (error) {
       console.error("Create connection error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.delete("/api/connections/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteConnection(req.params.id);
+      res.json({ message: "Connection removed" });
+    } catch (error) {
+      console.error("Delete connection error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/connections/:id/accept", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.acceptConnection(req.params.id);
+      res.json({ message: "Connection accepted" });
+    } catch (error) {
+      console.error("Accept connection error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });

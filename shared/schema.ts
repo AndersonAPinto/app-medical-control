@@ -62,6 +62,15 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+});
+
+export const updateRoleSchema = z.object({
+  role: z.enum(["MASTER", "DEPENDENT", "CONTROLLER"]),
+});
+
 export const insertMedicationSchema = createInsertSchema(medications).pick({
   name: true,
   dosage: true,
@@ -70,8 +79,16 @@ export const insertMedicationSchema = createInsertSchema(medications).pick({
   intervalInHours: true,
 });
 
+export const updateMedicationSchema = z.object({
+  name: z.string().min(1).optional(),
+  dosage: z.string().min(1).optional(),
+  currentStock: z.number().min(0).optional(),
+  alertThreshold: z.number().min(0).optional(),
+  intervalInHours: z.number().min(1).optional(),
+});
+
 export const insertConnectionSchema = z.object({
-  dependentId: z.string().min(1),
+  targetId: z.string().min(1),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
