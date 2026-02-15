@@ -446,6 +446,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dependents", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "MASTER") {
+        return res.status(403).json({ message: "Only MASTER users can view dependents" });
+      }
+
+      const dependents = await storage.getDependentsForMaster(req.session.userId!);
+      const enriched = [];
+
+      for (const dep of dependents) {
+        const schedules = await storage.getSchedulesByOwner(dep.id);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStart = today.getTime();
+
+        const todaySchedules = schedules.filter(s => s.timeMillis >= todayStart);
+        const takenToday = todaySchedules.filter(s => s.status === "TAKEN").length;
+        const missedToday = todaySchedules.filter(s => s.status === "MISSED").length;
+
+        const meds = await storage.getMedicationsByOwner(dep.id);
+
+        enriched.push({
+          id: dep.id,
+          name: dep.name,
+          email: dep.email,
+          role: dep.role,
+          takenToday,
+          missedToday,
+          totalMeds: meds.length,
+        });
+      }
+
+      res.json(enriched);
+    } catch (error) {
+      console.error("Get dependents error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/dependents/:id/history", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "MASTER") {
+        return res.status(403).json({ message: "Only MASTER users can view dependent history" });
+      }
+
+      const depId = req.params.id;
+      const schedules = await storage.getSchedulesByOwnerWithStatus(depId, ["TAKEN", "MISSED"]);
+      const meds = await storage.getMedicationsByOwner(depId);
+      const medMap = new Map(meds.map(m => [m.id, m]));
+
+      const enriched = schedules.map(s => ({
+        ...s,
+        medicationName: medMap.get(s.medId)?.name || "Remedio removido",
+        medicationDosage: medMap.get(s.medId)?.dosage || "",
+      }));
+
+      res.json(enriched);
+    } catch (error) {
+      console.error("Get dependent history error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

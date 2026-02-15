@@ -57,6 +57,7 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen name="connections" />
+      <Stack.Screen name="dependent-detail" />
     </Stack>
   );
 }

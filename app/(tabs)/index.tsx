@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -36,6 +37,16 @@ interface Schedule {
   timeMillis: number;
   status: string;
   confirmedAt: number | null;
+}
+
+interface DependentSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  takenToday: number;
+  missedToday: number;
+  totalMeds: number;
 }
 
 function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onConfirmDose: (med: Medication) => void; colors: typeof Colors.light }) {
@@ -84,14 +95,64 @@ function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onCon
   );
 }
 
+function DependentCard({ dep, colors }: { dep: DependentSummary; colors: typeof Colors.light }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.depCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }, pressed && styles.cardPressed]}
+      onPress={() => router.push({ pathname: "/dependent-detail", params: { id: dep.id, name: dep.name } })}
+    >
+      <View style={styles.depCardLeft}>
+        <View style={[styles.depAvatar, { backgroundColor: colors.tintLight }]}>
+          <Text style={[styles.depAvatarText, { color: colors.tint }]}>
+            {dep.name?.charAt(0)?.toUpperCase() || "?"}
+          </Text>
+        </View>
+        <View style={styles.depInfo}>
+          <Text style={[styles.depName, { color: colors.text }]}>{dep.name}</Text>
+          <Text style={[styles.depEmail, { color: colors.textSecondary }]}>{dep.email}</Text>
+          <View style={styles.depStats}>
+            <View style={styles.depStatItem}>
+              <Ionicons name="medkit-outline" size={12} color={colors.textSecondary} />
+              <Text style={[styles.depStatText, { color: colors.textSecondary }]}>{dep.totalMeds} remedios</Text>
+            </View>
+            <View style={[styles.metaDot, { backgroundColor: colors.textSecondary }]} />
+            <View style={styles.depStatItem}>
+              <Ionicons name="checkmark-circle-outline" size={12} color={colors.success} />
+              <Text style={[styles.depStatText, { color: colors.success }]}>{dep.takenToday} hoje</Text>
+            </View>
+            {dep.missedToday > 0 && (
+              <>
+                <View style={[styles.metaDot, { backgroundColor: colors.textSecondary }]} />
+                <View style={styles.depStatItem}>
+                  <Ionicons name="close-circle-outline" size={12} color={colors.danger} />
+                  <Text style={[styles.depStatText, { color: colors.danger }]}>{dep.missedToday} atrasos</Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+
+      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+    </Pressable>
+  );
+}
+
 export default function DashboardScreen() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const isMaster = user?.role === "MASTER";
+  const [activeTab, setActiveTab] = useState<"meds" | "deps">("meds");
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
+  });
+
+  const dependentsQuery = useQuery<DependentSummary[]>({
+    queryKey: ["/api/dependents"],
+    enabled: isMaster,
   });
 
   const confirmMutation = useMutation({
@@ -116,6 +177,7 @@ export default function DashboardScreen() {
   });
 
   const medications = medsQuery.data || [];
+  const dependents = dependentsQuery.data || [];
   const lowStockMeds = medications.filter((m) => m.currentStock <= m.alertThreshold && m.currentStock > 0);
   const outOfStockMeds = medications.filter((m) => m.currentStock === 0);
 
@@ -124,6 +186,119 @@ export default function DashboardScreen() {
     if (hour < 12) return "Bom dia";
     if (hour < 18) return "Boa tarde";
     return "Boa noite";
+  };
+
+  const handleAddDependent = () => {
+    if (user?.planType === "FREE" && dependents.length >= 1) {
+      Alert.alert(
+        "Limite do Plano Free",
+        "Voce atingiu o limite de 1 dependente do plano gratuito. Faca upgrade para Premium para monitorar dependentes ilimitados.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Fazer Upgrade",
+            onPress: async () => {
+              try {
+                await apiRequest("POST", "/api/auth/upgrade");
+                await refreshUser();
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert("Sucesso", "Plano atualizado para Premium!");
+              } catch (e: any) {
+                Alert.alert("Erro", e.message || "Nao foi possivel realizar o upgrade.");
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+    router.push("/connections");
+  };
+
+  const renderMedsContent = () => {
+    if (medsQuery.isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.tint} />
+        </View>
+      );
+    }
+    if (medications.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="medkit-outline" size={56} color={colors.border} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum remedio cadastrado</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Adicione seu primeiro medicamento</Text>
+          <Pressable
+            style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.tint }, pressed && styles.cardPressed]}
+            onPress={() => router.push("/add-medication")}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.emptyBtnText}>Adicionar</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return (
+      <FlatList
+        data={medications}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <MedicationCard med={item} onConfirmDose={(med) => confirmMutation.mutate(med)} colors={colors} />
+        )}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={medsQuery.isFetching}
+            onRefresh={() => medsQuery.refetch()}
+            tintColor={colors.tint}
+          />
+        }
+      />
+    );
+  };
+
+  const renderDepsContent = () => {
+    if (dependentsQuery.isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.tint} />
+        </View>
+      );
+    }
+    if (dependents.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="people-outline" size={56} color={colors.border} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum dependente</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Adicione um dependente para monitorar</Text>
+          <Pressable
+            style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.tint }, pressed && styles.cardPressed]}
+            onPress={handleAddDependent}
+          >
+            <Ionicons name="person-add" size={20} color="#fff" />
+            <Text style={styles.emptyBtnText}>Adicionar</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return (
+      <FlatList
+        data={dependents}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <DependentCard dep={item} colors={colors} />}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={dependentsQuery.isFetching}
+            onRefresh={() => dependentsQuery.refetch()}
+            tintColor={colors.tint}
+          />
+        }
+      />
+    );
   };
 
   return (
@@ -171,51 +346,56 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Seus Remedios</Text>
-        <Pressable
-          style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.tintLight }, pressed && { opacity: 0.7 }]}
-          onPress={() => router.push("/add-medication")}
-        >
-          <Ionicons name="add" size={22} color={colors.tint} />
-        </Pressable>
-      </View>
-
-      {medsQuery.isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
-        </View>
-      ) : medications.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="medkit-outline" size={56} color={colors.border} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum remedio cadastrado</Text>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Adicione seu primeiro medicamento</Text>
+      {isMaster && (
+        <View style={[styles.segmentControl, { backgroundColor: colors.inputBg }]}>
           <Pressable
-            style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.tint }, pressed && styles.cardPressed]}
-            onPress={() => router.push("/add-medication")}
+            style={[styles.segmentBtn, activeTab === "meds" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
+            onPress={() => { Haptics.selectionAsync(); setActiveTab("meds"); }}
           >
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.emptyBtnText}>Adicionar</Text>
+            <Ionicons name="medkit-outline" size={16} color={activeTab === "meds" ? colors.tint : colors.textSecondary} />
+            <Text style={[styles.segmentText, { color: activeTab === "meds" ? colors.tint : colors.textSecondary }, activeTab === "meds" && styles.segmentTextActive]}>
+              Meus Remedios
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segmentBtn, activeTab === "deps" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
+            onPress={() => { Haptics.selectionAsync(); setActiveTab("deps"); }}
+          >
+            <Ionicons name="people-outline" size={16} color={activeTab === "deps" ? colors.tint : colors.textSecondary} />
+            <Text style={[styles.segmentText, { color: activeTab === "deps" ? colors.tint : colors.textSecondary }, activeTab === "deps" && styles.segmentTextActive]}>
+              Meus Dependentes
+            </Text>
           </Pressable>
         </View>
-      ) : (
-        <FlatList
-          data={medications}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MedicationCard med={item} onConfirmDose={(med) => confirmMutation.mutate(med)} colors={colors} />
-          )}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={medsQuery.isFetching}
-              onRefresh={() => medsQuery.refetch()}
-              tintColor={colors.tint}
-            />
-          }
-        />
       )}
+
+      {(!isMaster || activeTab === "meds") && (
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {isMaster ? "" : "Seus Remedios"}
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.tintLight }, pressed && { opacity: 0.7 }]}
+            onPress={() => router.push("/add-medication")}
+          >
+            <Ionicons name="add" size={22} color={colors.tint} />
+          </Pressable>
+        </View>
+      )}
+
+      {activeTab === "deps" && isMaster && (
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{""}</Text>
+          <Pressable
+            style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.tintLight }, pressed && { opacity: 0.7 }]}
+            onPress={handleAddDependent}
+          >
+            <Ionicons name="person-add" size={18} color={colors.tint} />
+          </Pressable>
+        </View>
+      )}
+
+      {(!isMaster || activeTab === "meds") ? renderMedsContent() : renderDepsContent()}
     </View>
   );
 }
@@ -297,12 +477,42 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     marginTop: 2,
   },
+  segmentControl: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 3,
+    gap: 3,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  segmentBtnActive: {
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  segmentTextActive: {
+    fontFamily: "Inter_600SemiBold",
+  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 16,
     paddingBottom: 8,
   },
   sectionTitle: {
@@ -387,6 +597,62 @@ const styles = StyleSheet.create({
   confirmBtnPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.95 }],
+  },
+  depCard: {
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  depCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 12,
+  },
+  depAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  depAvatarText: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+  depInfo: {
+    flex: 1,
+  },
+  depName: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+  },
+  depEmail: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 1,
+  },
+  depStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 4,
+    flexWrap: "wrap",
+  },
+  depStatItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  depStatText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
   },
   loadingContainer: {
     flex: 1,

@@ -141,6 +141,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(connections).where(eq(connections.id, id));
   }
 
+  async getSchedulesByOwnerWithStatus(ownerId: string, statuses: string[]): Promise<DoseSchedule[]> {
+    const allSchedules = await db.select().from(doseSchedules).where(eq(doseSchedules.ownerId, ownerId)).orderBy(desc(doseSchedules.timeMillis));
+    return allSchedules.filter(s => statuses.includes(s.status));
+  }
+
   async getDependentsForMaster(masterId: string): Promise<User[]> {
     const conns = await this.getConnectionsByMaster(masterId);
     const acceptedConns = conns.filter(c => c.status === "ACCEPTED");
