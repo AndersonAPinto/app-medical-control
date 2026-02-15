@@ -157,22 +157,15 @@ export default function DashboardScreen() {
 
   const confirmMutation = useMutation({
     mutationFn: async (med: Medication) => {
-      const res = await apiRequest("POST", "/api/schedules", {
-        medId: med.id,
-        timeMillis: Date.now(),
-      });
-      const schedule = await res.json();
-      await apiRequest("PATCH", `/api/schedules/${schedule.id}/confirm`);
-      if (med.currentStock > 0) {
-        await apiRequest("PATCH", `/api/medications/${med.id}/stock`, {
-          currentStock: med.currentStock - 1,
-        });
-      }
+      await apiRequest("POST", `/api/medications/${med.id}/take-dose`);
     },
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/schedules/history"] });
+      if (isMaster) {
+        queryClient.invalidateQueries({ queryKey: ["/api/dependents"] });
+      }
     },
   });
 

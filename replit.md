@@ -36,6 +36,10 @@ MedControl is a medication management mobile app built with Expo (React Native) 
 - GET/POST /api/schedules - List/Create dose schedules
 - GET /api/schedules/history - Get confirmed doses (reverse chronological)
 - PATCH /api/schedules/:id/confirm - Confirm dose taken
+- POST /api/medications/:id/take-dose - Single-call dose confirm (creates TAKEN schedule, decrements stock)
+- GET /api/dependents - List dependents with summary stats (MASTER only)
+- GET /api/dependents/:id/history - Dependent dose history with med names (MASTER only)
+- GET /api/dependents/:id/medications - Dependent medications (MASTER only)
 - GET/POST /api/connections - List/Create user connections
 - DELETE /api/connections/:id - Remove connection
 - PATCH /api/connections/:id/accept - Accept pending connection

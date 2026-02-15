@@ -329,6 +329,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/medications/:id/take-dose", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const medId = req.params.id;
+      const userId = req.session.userId!;
+      const now = Date.now();
+
+      const med = await storage.getMedicationById(medId);
+      if (!med) {
+        return res.status(404).json({ message: "Medication not found" });
+      }
+      if (med.ownerId !== userId) {
+        return res.status(403).json({ message: "Not your medication" });
+      }
+
+      const schedule = await storage.createSchedule({
+        medId,
+        timeMillis: now,
+        status: "TAKEN",
+        confirmedAt: now,
+        ownerId: userId,
+      });
+
+      if (med.currentStock > 0) {
+        await storage.updateMedicationStock(medId, med.currentStock - 1);
+      }
+
+      res.status(201).json({
+        schedule,
+        medName: med.name,
+        patientId: userId,
+        timestamp: now,
+        status: "TAKEN",
+      });
+    } catch (error) {
+      console.error("Take dose error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.get("/api/connections", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
