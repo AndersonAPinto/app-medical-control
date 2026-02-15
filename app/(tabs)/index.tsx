@@ -146,7 +146,7 @@ export default function DashboardScreen() {
 
         {(lowStockMeds.length > 0 || outOfStockMeds.length > 0) && (
           <View style={styles.alertBanner}>
-            <Ionicons name="warning" size={16} color={Colors.light.warning} />
+            <Ionicons name="warning" size={16} color={colors.warning} />
             <Text style={styles.alertText}>
               {outOfStockMeds.length > 0
                 ? `${outOfStockMeds.length} remedio(s) sem estoque`
