@@ -27,6 +27,16 @@ function RootLayoutNav() {
           headerTintColor: "#0D9488",
         }}
       />
+      <Stack.Screen
+        name="edit-medication"
+        options={{
+          presentation: "modal",
+          headerShown: true,
+          headerTitle: "Editar Medicamento",
+          headerTintColor: "#0D9488",
+        }}
+      />
+      <Stack.Screen name="connections" />
     </Stack>
   );
 }

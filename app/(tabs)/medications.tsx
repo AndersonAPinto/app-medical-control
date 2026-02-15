@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -28,7 +28,17 @@ interface Medication {
   ownerId: string;
 }
 
-function MedicationDetailCard({ med, onDelete }: { med: Medication; onDelete: (id: string) => void }) {
+interface HistoryEntry {
+  id: string;
+  medId: string;
+  timeMillis: number;
+  status: string;
+  confirmedAt: string;
+  medicationName: string;
+  medicationDosage: string;
+}
+
+function MedicationDetailCard({ med, onDelete, onEdit }: { med: Medication; onDelete: (id: string) => void; onEdit: (id: string) => void }) {
   const isLowStock = med.currentStock <= med.alertThreshold;
   const isOutOfStock = med.currentStock === 0;
   const stockPercentage = med.alertThreshold > 0
@@ -36,7 +46,13 @@ function MedicationDetailCard({ med, onDelete }: { med: Medication; onDelete: (i
     : 100;
 
   return (
-    <View style={styles.detailCard}>
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onEdit(med.id);
+      }}
+      style={({ pressed }) => [styles.detailCard, pressed && { opacity: 0.9 }]}
+    >
       <View style={styles.detailHeader}>
         <View style={[styles.medIcon, isOutOfStock && styles.medIconDanger, isLowStock && !isOutOfStock && styles.medIconWarning]}>
           <Ionicons
@@ -101,15 +117,50 @@ function MedicationDetailCard({ med, onDelete }: { med: Medication; onDelete: (i
           {isOutOfStock ? "Sem estoque" : isLowStock ? "Estoque baixo" : "Estoque adequado"}
         </Text>
       </View>
+    </Pressable>
+  );
+}
+
+function HistoryItem({ entry }: { entry: HistoryEntry }) {
+  const confirmedDate = entry.confirmedAt ? new Date(entry.confirmedAt) : new Date(entry.timeMillis);
+  const formattedDate = confirmedDate.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const formattedTime = confirmedDate.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <View style={styles.historyCard}>
+      <View style={styles.historyIcon}>
+        <Ionicons name="checkmark-circle" size={22} color={Colors.light.success} />
+      </View>
+      <View style={styles.historyInfo}>
+        <Text style={styles.historyName}>{entry.medicationName}</Text>
+        <Text style={styles.historyDosage}>{entry.medicationDosage}</Text>
+      </View>
+      <View style={styles.historyTime}>
+        <Text style={styles.historyDate}>{formattedDate}</Text>
+        <Text style={styles.historyHour}>{formattedTime}</Text>
+      </View>
     </View>
   );
 }
 
 export default function MedicationsScreen() {
   const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<"remedios" | "historico">("remedios");
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
+  });
+
+  const historyQuery = useQuery<HistoryEntry[]>({
+    queryKey: ["/api/schedules/history"],
+    enabled: activeTab === "historico",
   });
 
   const deleteMutation = useMutation({
@@ -123,6 +174,7 @@ export default function MedicationsScreen() {
   });
 
   const medications = medsQuery.data || [];
+  const history = historyQuery.data || [];
 
   return (
     <View style={styles.container}>
@@ -136,33 +188,97 @@ export default function MedicationsScreen() {
         </Pressable>
       </View>
 
-      {medsQuery.isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.tint} />
+      <View style={styles.segmentContainer}>
+        <View style={styles.segmentControl}>
+          <Pressable
+            style={[styles.segmentBtn, activeTab === "remedios" && styles.segmentBtnActive]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setActiveTab("remedios");
+            }}
+          >
+            <Text style={[styles.segmentText, activeTab === "remedios" && styles.segmentTextActive]}>
+              Remedios
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segmentBtn, activeTab === "historico" && styles.segmentBtnActive]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setActiveTab("historico");
+            }}
+          >
+            <Text style={[styles.segmentText, activeTab === "historico" && styles.segmentTextActive]}>
+              Historico
+            </Text>
+          </Pressable>
         </View>
-      ) : medications.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="medkit-outline" size={56} color={Colors.light.border} />
-          <Text style={styles.emptyTitle}>Lista vazia</Text>
-          <Text style={styles.emptyText}>Cadastre seus medicamentos para acompanhar estoque e horarios</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={medications}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MedicationDetailCard med={item} onDelete={(id) => deleteMutation.mutate(id)} />
-          )}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={medsQuery.isFetching}
-              onRefresh={() => medsQuery.refetch()}
-              tintColor={Colors.light.tint}
+      </View>
+
+      {activeTab === "remedios" ? (
+        <>
+          {medsQuery.isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.light.tint} />
+            </View>
+          ) : medications.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="medkit-outline" size={56} color={Colors.light.border} />
+              <Text style={styles.emptyTitle}>Lista vazia</Text>
+              <Text style={styles.emptyText}>Cadastre seus medicamentos para acompanhar estoque e horarios</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={medications}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <MedicationDetailCard
+                  med={item}
+                  onDelete={(id) => deleteMutation.mutate(id)}
+                  onEdit={(id) => router.push(`/edit-medication?id=${id}`)}
+                />
+              )}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={medsQuery.isFetching}
+                  onRefresh={() => medsQuery.refetch()}
+                  tintColor={Colors.light.tint}
+                />
+              }
             />
-          }
-        />
+          )}
+        </>
+      ) : (
+        <>
+          {historyQuery.isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.light.tint} />
+            </View>
+          ) : history.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="time-outline" size={56} color={Colors.light.border} />
+              <Text style={styles.emptyTitle}>Nenhuma dose registrada</Text>
+              <Text style={styles.emptyText}>O historico de doses confirmadas aparecera aqui</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={history}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <HistoryItem entry={item} />}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={historyQuery.isFetching}
+                  onRefresh={() => historyQuery.refetch()}
+                  tintColor={Colors.light.tint}
+                />
+              }
+            />
+          )}
+        </>
       )}
     </View>
   );
@@ -195,6 +311,41 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.tintLight,
     alignItems: "center",
     justifyContent: "center",
+  },
+  segmentContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: Colors.light.surface,
+  },
+  segmentControl: {
+    flexDirection: "row",
+    backgroundColor: Colors.light.inputBg,
+    borderRadius: 12,
+    padding: 3,
+  },
+  segmentBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentBtnActive: {
+    backgroundColor: Colors.light.surface,
+    shadowColor: Colors.light.cardShadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.textSecondary,
+  },
+  segmentTextActive: {
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.text,
   },
   listContent: {
     padding: 20,
@@ -304,5 +455,54 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
     textAlign: "center" as const,
+  },
+  historyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.light.surface,
+    borderRadius: 14,
+    padding: 14,
+    gap: 12,
+    shadowColor: Colors.light.cardShadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  historyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.light.successLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  historyInfo: {
+    flex: 1,
+  },
+  historyName: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.text,
+  },
+  historyDosage: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+    marginTop: 1,
+  },
+  historyTime: {
+    alignItems: "flex-end",
+  },
+  historyDate: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.textSecondary,
+  },
+  historyHour: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.text,
+    marginTop: 2,
   },
 });
