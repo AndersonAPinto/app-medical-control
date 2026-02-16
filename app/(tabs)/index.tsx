@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
+import { cardShadow, smallShadow } from "@/lib/shadows";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface Medication {
@@ -55,7 +56,7 @@ function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onCon
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.medCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.medCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow), pressed && styles.cardPressed]}
       onPress={() => {}}
     >
       <View style={styles.medCardLeft}>
@@ -98,7 +99,7 @@ function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onCon
 function DependentCard({ dep, colors }: { dep: DependentSummary; colors: typeof Colors.light }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.depCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.depCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow), pressed && styles.cardPressed]}
       onPress={() => router.push({ pathname: "/dependent-detail", params: { id: dep.id, name: dep.name } })}
     >
       <View style={styles.depCardLeft}>
@@ -325,15 +326,15 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       <View style={styles.statsRow}>
-        <View style={[styles.statCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Text style={[styles.statValue, { color: colors.text }]}>{medications.length}</Text>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Remedios</Text>
         </View>
-        <View style={[styles.statCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Text style={[styles.statValue, { color: colors.success }]}>{medications.filter(m => m.currentStock > m.alertThreshold).length}</Text>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Estoque OK</Text>
         </View>
-        <View style={[styles.statCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+        <View style={[styles.statCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Text style={[styles.statValue, { color: colors.warning }]}>{lowStockMeds.length + outOfStockMeds.length}</Text>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Alertas</Text>
         </View>
@@ -342,7 +343,7 @@ export default function DashboardScreen() {
       {isMaster && (
         <View style={[styles.segmentControl, { backgroundColor: colors.inputBg }]}>
           <Pressable
-            style={[styles.segmentBtn, activeTab === "meds" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
+            style={[styles.segmentBtn, activeTab === "meds" && [styles.segmentBtnActive, { backgroundColor: colors.surface }, smallShadow(colors.cardShadow)]]}
             onPress={() => { Haptics.selectionAsync(); setActiveTab("meds"); }}
           >
             <Ionicons name="medkit-outline" size={16} color={activeTab === "meds" ? colors.tint : colors.textSecondary} />
@@ -351,7 +352,7 @@ export default function DashboardScreen() {
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.segmentBtn, activeTab === "deps" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
+            style={[styles.segmentBtn, activeTab === "deps" && [styles.segmentBtnActive, { backgroundColor: colors.surface }, smallShadow(colors.cardShadow)]]}
             onPress={() => { Haptics.selectionAsync(); setActiveTab("deps"); }}
           >
             <Ionicons name="people-outline" size={16} color={activeTab === "deps" ? colors.tint : colors.textSecondary} />
@@ -456,10 +457,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     alignItems: "center",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   statValue: {
     fontSize: 22,
@@ -487,12 +484,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 6,
   },
-  segmentBtnActive: {
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+  segmentBtnActive: {},
   segmentText: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
@@ -530,10 +522,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   cardPressed: {
     opacity: 0.9,
@@ -597,10 +585,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   depCardLeft: {
     flexDirection: "row",

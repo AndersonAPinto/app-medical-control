@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
+import { cardShadow, smallShadow } from "@/lib/shadows";
 
 interface Medication {
   id: string;
@@ -52,7 +53,7 @@ function MedicationDetailCard({ med, onDelete, onEdit, colors }: { med: Medicati
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onEdit(med.id);
       }}
-      style={({ pressed }) => [styles.detailCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }, pressed && { opacity: 0.9 }]}
+      style={({ pressed }) => [styles.detailCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow), pressed && { opacity: 0.9 }]}
     >
       <View style={styles.detailHeader}>
         <View style={[styles.medIcon, { backgroundColor: colors.tintLight }, isOutOfStock && { backgroundColor: colors.dangerLight }, isLowStock && !isOutOfStock && { backgroundColor: colors.warningLight }]}>
@@ -135,7 +136,7 @@ function HistoryItem({ entry, colors }: { entry: HistoryEntry; colors: typeof Co
   });
 
   return (
-    <View style={[styles.historyCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+    <View style={[styles.historyCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
       <View style={[styles.historyIcon, { backgroundColor: colors.successLight }]}>
         <Ionicons name="checkmark-circle" size={22} color={colors.success} />
       </View>
@@ -195,7 +196,7 @@ export default function MedicationsScreen() {
       <View style={[styles.segmentContainer, { backgroundColor: colors.surface }]}>
         <View style={[styles.segmentControl, { backgroundColor: colors.inputBg }]}>
           <Pressable
-            style={[styles.segmentBtn, activeTab === "remedios" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
+            style={[styles.segmentBtn, activeTab === "remedios" && [styles.segmentBtnActive, { backgroundColor: colors.surface }, smallShadow(colors.cardShadow)]]}
             onPress={() => {
               Haptics.selectionAsync();
               setActiveTab("remedios");
@@ -206,7 +207,7 @@ export default function MedicationsScreen() {
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.segmentBtn, activeTab === "historico" && [styles.segmentBtnActive, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]]}
+            style={[styles.segmentBtn, activeTab === "historico" && [styles.segmentBtnActive, { backgroundColor: colors.surface }, smallShadow(colors.cardShadow)]]}
             onPress={() => {
               Haptics.selectionAsync();
               setActiveTab("historico");
@@ -328,12 +329,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  segmentBtnActive: {
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
+  segmentBtnActive: {},
   segmentText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
@@ -349,10 +345,6 @@ const styles = StyleSheet.create({
   detailCard: {
     borderRadius: 18,
     padding: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   detailHeader: {
     flexDirection: "row",
@@ -437,10 +429,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     gap: 12,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 1,
   },
   historyIcon: {
     width: 40,

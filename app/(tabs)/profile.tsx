@@ -19,6 +19,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { apiRequest } from "@/lib/query-client";
+import { cardShadow } from "@/lib/shadows";
 
 const ROLES = [
   { key: "MASTER", label: "Responsavel", icon: "shield-checkmark" },
@@ -149,7 +150,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 100 }]} showsVerticalScrollIndicator={false}>
-        <View style={[styles.profileCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+        <View style={[styles.profileCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <View style={styles.avatarContainer}>
             <View style={[styles.avatar, { backgroundColor: colors.tint }]}>
               <Text style={styles.avatarText}>
@@ -171,7 +172,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Conta</Text>
 
-          <View style={[styles.menuCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+          <View style={[styles.menuCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
             <Pressable style={styles.menuItem} onPress={handleOpenEdit}>
               <View style={[styles.menuIcon, { backgroundColor: colors.tintLight }]}>
                 <Ionicons name="person-outline" size={18} color={colors.tint} />
@@ -215,7 +216,7 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Configuracoes</Text>
-          <View style={[styles.menuCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+          <View style={[styles.menuCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
             <Pressable style={styles.menuItem} onPress={handleThemePress}>
               <View style={[styles.menuIcon, { backgroundColor: isDark ? "rgba(99, 102, 241, 0.15)" : "#EEF2FF" }]}>
                 <Ionicons name={isDark ? "moon" : "sunny"} size={18} color={isDark ? "#818CF8" : "#F59E0B"} />
@@ -235,7 +236,7 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Info</Text>
-          <View style={[styles.menuCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+          <View style={[styles.menuCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
             <Pressable style={styles.menuItem} onPress={handleCopyId}>
               <View style={[styles.menuIcon, { backgroundColor: colors.inputBg }]}>
                 <Ionicons name="finger-print-outline" size={18} color={colors.textSecondary} />
@@ -367,10 +368,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     alignItems: "center",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   avatarContainer: {
     marginBottom: 12,
@@ -423,10 +420,6 @@ const styles = StyleSheet.create({
   menuCard: {
     borderRadius: 16,
     overflow: "hidden",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   menuItem: {
     flexDirection: "row",

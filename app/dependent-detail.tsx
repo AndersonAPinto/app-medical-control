@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
+import { cardShadow } from "@/lib/shadows";
 
 interface HistoryEntry {
   id: string;
@@ -33,7 +34,7 @@ function HistoryItem({ item, colors }: { item: HistoryEntry; colors: typeof Colo
   const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <View style={[styles.historyCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+    <View style={[styles.historyCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
       <View style={[styles.historyIcon, { backgroundColor: isTaken ? colors.successLight : colors.dangerLight }]}>
         <Ionicons
           name={isTaken ? "checkmark-circle" : "close-circle"}
@@ -96,17 +97,17 @@ export default function DependentDetailScreen() {
       </View>
 
       <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="medkit" size={20} color={colors.tint} />
           <Text style={[styles.summaryValue, { color: colors.text }]}>{meds.length}</Text>
           <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Remedios</Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="checkmark-circle" size={20} color={colors.success} />
           <Text style={[styles.summaryValue, { color: colors.success }]}>{history.filter(h => h.status === "TAKEN").length}</Text>
           <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Tomadas</Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="close-circle" size={20} color={colors.danger} />
           <Text style={[styles.summaryValue, { color: colors.danger }]}>{history.filter(h => h.status === "MISSED").length}</Text>
           <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Perdidas</Text>
@@ -209,10 +210,6 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: "center",
     gap: 4,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   summaryValue: {
     fontSize: 20,
@@ -240,10 +237,6 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     gap: 12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   historyIcon: {
     width: 40,

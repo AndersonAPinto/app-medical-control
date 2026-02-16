@@ -20,6 +20,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
+import { cardShadow } from "@/lib/shadows";
 
 interface Connection {
   id: string;
@@ -65,7 +66,7 @@ function ConnectionItem({
   const canAccept = isPending && item.dependentId === userId;
 
   return (
-    <View style={[styles.connectionCard, { backgroundColor: colors.surface, shadowColor: colors.cardShadow }]}>
+    <View style={[styles.connectionCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
       <View style={[styles.connectionAvatar, { backgroundColor: colors.tintLight }]}>
         <Text style={[styles.connectionAvatarText, { color: colors.tint }]}>
           {item.linkedName?.charAt(0)?.toUpperCase() || "?"}
@@ -453,10 +454,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
     gap: 12,
   },
   connectionAvatar: {
