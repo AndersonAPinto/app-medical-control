@@ -240,7 +240,7 @@ export default function EditMedicationScreen() {
         <View style={[styles.infoBox, { backgroundColor: colors.tintLight }]}>
           <Ionicons name="information-circle-outline" size={18} color={colors.tint} />
           <Text style={[styles.infoText, { color: colors.tint }]}>
-            Voce sera alertado quando o estoque atingir {alertThreshold || "5"} unidades
+            Você será alertado quando o estoque atingir {alertThreshold || "5"} unidades
           </Text>
         </View>
 
@@ -259,7 +259,7 @@ export default function EditMedicationScreen() {
           ) : (
             <>
               <Ionicons name="checkmark" size={22} color="#fff" />
-              <Text style={styles.saveBtnText}>Salvar Alteracoes</Text>
+              <Text style={styles.saveBtnText}>Salvar Alterações</Text>
             </>
           )}
         </Pressable>

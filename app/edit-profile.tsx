@@ -32,7 +32,7 @@ export default function EditProfileScreen() {
 
   const handleSave = async () => {
     if (!name.trim() || !email.trim()) {
-      Alert.alert("Erro", "Nome e email sao obrigatorios.");
+      Alert.alert("Erro", "Nome e email são obrigatórios.");
       return;
     }
     setSaving(true);
@@ -45,7 +45,7 @@ export default function EditProfileScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (e: any) {
-      Alert.alert("Erro", e.message || "Nao foi possivel salvar o perfil.");
+      Alert.alert("Erro", e.message || "Não foi possível salvar o perfil.");
     } finally {
       setSaving(false);
     }
@@ -66,7 +66,7 @@ export default function EditProfileScreen() {
           <View style={[styles.bigIcon, { backgroundColor: colors.tintLight }]}>
             <Ionicons name="person" size={36} color={colors.tint} />
           </View>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Atualize suas informacoes pessoais</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Atualize suas informações pessoais</Text>
         </View>
 
         <Text style={[styles.label, { color: colors.text }]}>Nome</Text>
@@ -99,7 +99,7 @@ export default function EditProfileScreen() {
         <View style={[styles.infoBox, { backgroundColor: colors.tintLight }]}>
           <Ionicons name="information-circle-outline" size={18} color={colors.tint} />
           <Text style={[styles.infoText, { color: colors.tint }]}>
-            Essas informacoes sao usadas para identificar voce no app
+            Essas informações são usadas para identificar você no app
           </Text>
         </View>
 
@@ -118,7 +118,7 @@ export default function EditProfileScreen() {
           ) : (
             <>
               <Ionicons name="checkmark" size={22} color="#fff" />
-              <Text style={styles.saveBtnText}>Salvar Alteracoes</Text>
+              <Text style={styles.saveBtnText}>Salvar Alterações</Text>
             </>
           )}
         </Pressable>

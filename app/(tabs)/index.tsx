@@ -114,7 +114,7 @@ function DependentCard({ dep, colors }: { dep: DependentSummary; colors: typeof 
           <View style={styles.depStats}>
             <View style={styles.depStatItem}>
               <Ionicons name="medkit-outline" size={12} color={colors.textSecondary} />
-              <Text style={[styles.depStatText, { color: colors.textSecondary }]}>{dep.totalMeds} remedios</Text>
+              <Text style={[styles.depStatText, { color: colors.textSecondary }]}>{dep.totalMeds} remédios</Text>
             </View>
             <View style={[styles.metaDot, { backgroundColor: colors.textSecondary }]} />
             <View style={styles.depStatItem}>
@@ -186,7 +186,7 @@ export default function DashboardScreen() {
     if (user?.planType === "FREE" && dependents.length >= 1) {
       Alert.alert(
         "Limite do Plano Free",
-        "Voce atingiu o limite de 1 dependente do plano gratuito. Faca upgrade para Premium para monitorar dependentes ilimitados.",
+        "Você atingiu o limite de 1 dependente do plano gratuito. Faça upgrade para Premium para monitorar dependentes ilimitados.",
         [
           { text: "Cancelar", style: "cancel" },
           {
@@ -198,7 +198,7 @@ export default function DashboardScreen() {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 Alert.alert("Sucesso", "Plano atualizado para Premium!");
               } catch (e: any) {
-                Alert.alert("Erro", e.message || "Nao foi possivel realizar o upgrade.");
+                Alert.alert("Erro", e.message || "Não foi possível realizar o upgrade.");
               }
             },
           },
@@ -221,7 +221,7 @@ export default function DashboardScreen() {
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="medkit-outline" size={56} color={colors.border} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum remedio cadastrado</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum remédio cadastrado</Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Adicione seu primeiro medicamento</Text>
           <Pressable
             style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.tint }, pressed && styles.cardPressed]}
@@ -304,7 +304,7 @@ export default function DashboardScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.greeting}>{greeting()}</Text>
-            <Text style={styles.userName}>{user?.name || "Usuario"}</Text>
+            <Text style={styles.userName}>{user?.name || "Usuário"}</Text>
           </View>
           <View style={styles.roleChip}>
             <Text style={styles.roleChipText}>
@@ -318,8 +318,8 @@ export default function DashboardScreen() {
             <Ionicons name="warning" size={16} color={colors.warning} />
             <Text style={styles.alertText}>
               {outOfStockMeds.length > 0
-                ? `${outOfStockMeds.length} remedio(s) sem estoque`
-                : `${lowStockMeds.length} remedio(s) com estoque baixo`}
+                ? `${outOfStockMeds.length} remédio(s) sem estoque`
+                : `${lowStockMeds.length} remédio(s) com estoque baixo`}
             </Text>
           </View>
         )}
@@ -328,7 +328,7 @@ export default function DashboardScreen() {
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Text style={[styles.statValue, { color: colors.text }]}>{medications.length}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Remedios</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Remédios</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Text style={[styles.statValue, { color: colors.success }]}>{medications.filter(m => m.currentStock > m.alertThreshold).length}</Text>
@@ -348,7 +348,7 @@ export default function DashboardScreen() {
           >
             <Ionicons name="medkit-outline" size={16} color={activeTab === "meds" ? colors.tint : colors.textSecondary} />
             <Text style={[styles.segmentText, { color: activeTab === "meds" ? colors.tint : colors.textSecondary }, activeTab === "meds" && styles.segmentTextActive]}>
-              Meus Remedios
+              Meus Remédios
             </Text>
           </Pressable>
           <Pressable
@@ -366,7 +366,7 @@ export default function DashboardScreen() {
       {(!isMaster || activeTab === "meds") && (
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {isMaster ? "" : "Seus Remedios"}
+            {isMaster ? "" : "Seus Remédios"}
           </Text>
           <Pressable
             style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.tintLight }, pressed && { opacity: 0.7 }]}

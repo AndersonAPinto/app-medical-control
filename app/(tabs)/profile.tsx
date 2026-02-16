@@ -76,8 +76,8 @@ export default function ProfileScreen() {
       return;
     }
     Alert.alert(
-      "Alterar Funcao",
-      "Mudar sua funcao afeta suas permissoes no app. Deseja continuar?",
+      "Alterar Função",
+      "Mudar sua função afeta suas permissões no app. Deseja continuar?",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -90,7 +90,7 @@ export default function ProfileScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setRolePickerVisible(false);
             } catch (e: any) {
-              Alert.alert("Erro", e.message || "Nao foi possivel alterar a funcao.");
+              Alert.alert("Erro", e.message || "Não foi possível alterar a função.");
             } finally {
               setChangingRole(false);
             }
@@ -103,12 +103,12 @@ export default function ProfileScreen() {
   const handlePlanPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (user?.planType === "PREMIUM") {
-      Alert.alert("Plano Premium", "Voce ja e um usuario Premium!");
+      Alert.alert("Plano Premium", "Você já é um usuário Premium!");
       return;
     }
     Alert.alert(
       "Upgrade para Premium",
-      "Desbloqueie recursos ilimitados, conexoes e muito mais por R$9,90/mes.",
+      "Desbloqueie recursos ilimitados, conexões e muito mais por R$9,90/mes.",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("Sucesso", "Parabens! Seu plano foi atualizado para Premium.");
             } catch (e: any) {
-              Alert.alert("Erro", e.message || "Nao foi possivel realizar o upgrade.");
+              Alert.alert("Erro", e.message || "Não foi possível realizar o upgrade.");
             } finally {
               setUpgrading(false);
             }
@@ -208,14 +208,14 @@ export default function ProfileScreen() {
               <View style={[styles.menuIcon, { backgroundColor: colors.tintLight }]}>
                 <Ionicons name="people-outline" size={18} color={colors.tint} />
               </View>
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Conexoes</Text>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Conexões</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Configuracoes</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Configurações</Text>
           <View style={[styles.menuCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
             <Pressable style={styles.menuItem} onPress={handleThemePress}>
               <View style={[styles.menuIcon, { backgroundColor: isDark ? "rgba(99, 102, 241, 0.15)" : "#EEF2FF" }]}>
@@ -267,8 +267,8 @@ export default function ProfileScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setRolePickerVisible(false)}>
           <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={() => {}}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Selecionar Funcao</Text>
-            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Escolha sua funcao no app</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Selecionar Função</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Escolha sua função no app</Text>
             {ROLES.map((role) => {
               const isSelected = role.key === user?.role;
               return (

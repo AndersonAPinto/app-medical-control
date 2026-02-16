@@ -154,7 +154,7 @@ export default function ConnectionsScreen() {
             return;
           }
         } catch {}
-        Alert.alert("Erro", "Nao foi possivel criar a conexao.");
+        Alert.alert("Erro", "Não foi possível criar a conexão.");
       }
     },
   });
@@ -162,7 +162,7 @@ export default function ConnectionsScreen() {
   const showUpgradeDialog = () => {
     Alert.alert(
       "Limite do Plano Free",
-      "Voce atingiu o limite de conexoes do plano gratuito. Faca upgrade para Premium para conexoes ilimitadas.",
+      "Você atingiu o limite de conexões do plano gratuito. Faça upgrade para Premium para conexões ilimitadas.",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -174,7 +174,7 @@ export default function ConnectionsScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("Sucesso", "Plano atualizado para Premium!");
             } catch (e: any) {
-              Alert.alert("Erro", e.message || "Nao foi possivel realizar o upgrade.");
+              Alert.alert("Erro", e.message || "Não foi possível realizar o upgrade.");
             }
           },
         },
@@ -197,7 +197,7 @@ export default function ConnectionsScreen() {
 
       Alert.alert(
         "Conectar",
-        `Deseja conectar-se com ${foundUser.name}?\n\nFuncao: ${ROLE_LABELS[foundUser.role] || foundUser.role}\nEmail: ${foundUser.email}`,
+        `Deseja conectar-se com ${foundUser.name}?\n\nFunção: ${ROLE_LABELS[foundUser.role] || foundUser.role}\nEmail: ${foundUser.email}`,
         [
           { text: "Cancelar", style: "cancel" },
           {
@@ -209,9 +209,9 @@ export default function ConnectionsScreen() {
     } catch (err: any) {
       const msg = err.message || "";
       if (msg.includes("404")) {
-        Alert.alert("Nao encontrado", "Nenhum usuario encontrado com esse ID ou email.");
+        Alert.alert("Não encontrado", "Nenhum usuário encontrado com esse ID ou email.");
       } else {
-        Alert.alert("Erro", "Nao foi possivel buscar o usuario.");
+        Alert.alert("Erro", "Não foi possível buscar o usuário.");
       }
     } finally {
       setSearching(false);
@@ -220,8 +220,8 @@ export default function ConnectionsScreen() {
 
   const handleDelete = (connectionId: string) => {
     Alert.alert(
-      "Remover Conexao",
-      "Deseja realmente remover esta conexao?",
+      "Remover Conexão",
+      "Deseja realmente remover esta conexão?",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -234,7 +234,7 @@ export default function ConnectionsScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
             } catch (e: any) {
-              Alert.alert("Erro", e.message || "Nao foi possivel remover a conexao.");
+              Alert.alert("Erro", e.message || "Não foi possível remover a conexão.");
             } finally {
               setDeletingId(null);
             }
@@ -246,8 +246,8 @@ export default function ConnectionsScreen() {
 
   const handleAccept = (connectionId: string) => {
     Alert.alert(
-      "Aceitar Conexao",
-      "Deseja aceitar esta conexao?",
+      "Aceitar Conexão",
+      "Deseja aceitar esta conexão?",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -259,7 +259,7 @@ export default function ConnectionsScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
             } catch (e: any) {
-              Alert.alert("Erro", e.message || "Nao foi possivel aceitar a conexao.");
+              Alert.alert("Erro", e.message || "Não foi possível aceitar a conexão.");
             } finally {
               setAcceptingId(null);
             }
@@ -290,9 +290,9 @@ export default function ConnectionsScreen() {
         <View style={[styles.emptyIcon, { backgroundColor: colors.inputBg }]}>
           <Ionicons name="people-outline" size={40} color={colors.textSecondary} />
         </View>
-        <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma conexao</Text>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma conexão</Text>
         <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-          Busque por ID ou email para adicionar uma conexao
+          Busque por ID ou email para adicionar uma conexão
         </Text>
       </View>
     );
@@ -305,7 +305,7 @@ export default function ConnectionsScreen() {
           <Pressable onPress={() => router.back()} hitSlop={12} style={[styles.backBtn, { backgroundColor: colors.inputBg }]}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Conexoes</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Conexões</Text>
           <View style={{ width: 36 }} />
         </View>
       </View>
@@ -369,11 +369,11 @@ export default function ConnectionsScreen() {
           connectionsQuery.isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.tint} />
-              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando conexoes...</Text>
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando conexões...</Text>
             </View>
           ) : connections.length > 0 ? (
             <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-              {connections.length} {connections.length === 1 ? "conexao" : "conexoes"}
+              {connections.length} {connections.length === 1 ? "conexão" : "conexões"}
             </Text>
           ) : null
         }

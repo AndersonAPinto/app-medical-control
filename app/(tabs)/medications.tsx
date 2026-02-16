@@ -203,7 +203,7 @@ export default function MedicationsScreen() {
             }}
           >
             <Text style={[styles.segmentText, { color: colors.textSecondary }, activeTab === "remedios" && [styles.segmentTextActive, { color: colors.text }]]}>
-              Remedios
+              Remédios
             </Text>
           </Pressable>
           <Pressable
@@ -214,7 +214,7 @@ export default function MedicationsScreen() {
             }}
           >
             <Text style={[styles.segmentText, { color: colors.textSecondary }, activeTab === "historico" && [styles.segmentTextActive, { color: colors.text }]]}>
-              Historico
+              Histórico
             </Text>
           </Pressable>
         </View>
@@ -230,7 +230,7 @@ export default function MedicationsScreen() {
             <View style={styles.emptyContainer}>
               <Ionicons name="medkit-outline" size={56} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>Lista vazia</Text>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Cadastre seus medicamentos para acompanhar estoque e horarios</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Cadastre seus medicamentos para acompanhar estoque e horários</Text>
             </View>
           ) : (
             <FlatList
@@ -266,7 +266,7 @@ export default function MedicationsScreen() {
             <View style={styles.emptyContainer}>
               <Ionicons name="time-outline" size={56} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma dose registrada</Text>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>O historico de doses confirmadas aparecera aqui</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>O histórico de doses confirmadas aparecerá aqui</Text>
             </View>
           ) : (
             <FlatList

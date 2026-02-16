@@ -90,7 +90,7 @@ export default function DependentDetailScreen() {
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{name || "Dependente"}</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Historico de doses</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Histórico de doses</Text>
           </View>
           <View style={{ width: 36 }} />
         </View>
@@ -100,7 +100,7 @@ export default function DependentDetailScreen() {
         <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="medkit" size={20} color={colors.tint} />
           <Text style={[styles.summaryValue, { color: colors.text }]}>{meds.length}</Text>
-          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Remedios</Text>
+          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Remédios</Text>
         </View>
         <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="checkmark-circle" size={20} color={colors.success} />
@@ -117,7 +117,7 @@ export default function DependentDetailScreen() {
       {historyQuery.isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.tint} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando historico...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando histórico...</Text>
         </View>
       ) : (
         <FlatList
@@ -154,7 +154,7 @@ export default function DependentDetailScreen() {
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhum registro</Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Este dependente ainda nao possui historico de doses
+                Este dependente ainda não possui histórico de doses
               </Text>
             </View>
           }

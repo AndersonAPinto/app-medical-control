@@ -5,10 +5,10 @@ import { Ionicons } from "@expo/vector-icons";
 export default function NotFoundScreen() {
   return (
     <>
-      <Stack.Screen options={{ title: "Pagina nao encontrada" }} />
+      <Stack.Screen options={{ title: "Página não encontrada" }} />
       <View style={styles.container}>
         <Ionicons name="alert-circle-outline" size={56} color="#999" />
-        <Text style={styles.title}>Esta pagina nao existe.</Text>
+        <Text style={styles.title}>Esta página não existe.</Text>
         <Link href="/" style={styles.link}>
           <Text style={styles.linkText}>Voltar para o inicio</Text>
         </Link>

@@ -19,7 +19,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="medications">
         <Icon sf={{ default: "pills", selected: "pills.fill" }} />
-        <Label>Remedios</Label>
+        <Label>Remédios</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
@@ -76,7 +76,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="medications"
         options={{
-          title: "Remedios",
+          title: "Remédios",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="medkit-outline" size={size} color={color} />
           ),

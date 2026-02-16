@@ -170,7 +170,7 @@ export default function AddMedicationScreen() {
         <View style={[styles.infoBox, { backgroundColor: colors.tintLight }]}>
           <Ionicons name="information-circle-outline" size={18} color={colors.tint} />
           <Text style={[styles.infoText, { color: colors.tint }]}>
-            Voce sera alertado quando o estoque atingir {alertThreshold || "5"} unidades
+            Você será alertado quando o estoque atingir {alertThreshold || "5"} unidades
           </Text>
         </View>
 
