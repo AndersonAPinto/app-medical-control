@@ -247,6 +247,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/medications/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const med = await storage.getMedicationById(req.params.id);
+      if (!med) {
+        return res.status(404).json({ message: "Medication not found" });
+      }
+      if (med.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Not your medication" });
+      }
       await storage.deleteMedication(req.params.id, req.session.userId!);
       res.json({ message: "Deleted" });
     } catch (error) {
@@ -321,6 +328,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/schedules/:id/confirm", requireAuth, async (req: Request, res: Response) => {
     try {
+      const schedule = await storage.getScheduleById(req.params.id);
+      if (!schedule) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+      if (schedule.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Not your schedule" });
+      }
       await storage.updateScheduleStatus(req.params.id, "TAKEN", Date.now());
       res.json({ message: "Dose confirmed" });
     } catch (error) {

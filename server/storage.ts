@@ -36,6 +36,7 @@ export interface IStorage {
   deleteMedication(id: string, ownerId: string): Promise<void>;
   updateMedicationStock(id: string, newStock: number): Promise<void>;
   getSchedulesByOwner(ownerId: string): Promise<DoseSchedule[]>;
+  getScheduleById(id: string): Promise<DoseSchedule | undefined>;
   getConfirmedSchedulesByOwner(ownerId: string): Promise<DoseSchedule[]>;
   createSchedule(schedule: Omit<DoseSchedule, "id">): Promise<DoseSchedule>;
   updateScheduleStatus(id: string, status: string, confirmedAt?: number): Promise<void>;
@@ -100,6 +101,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(doseSchedules).where(eq(doseSchedules.ownerId, ownerId));
   }
 
+  async getScheduleById(id: string): Promise<DoseSchedule | undefined> {
+    const [schedule] = await db.select().from(doseSchedules).where(eq(doseSchedules.id, id));
+    return schedule;
+  }
+
   async getConfirmedSchedulesByOwner(ownerId: string): Promise<DoseSchedule[]> {
     return db.select().from(doseSchedules)
       .where(and(eq(doseSchedules.ownerId, ownerId), eq(doseSchedules.status, "TAKEN")))
@@ -151,8 +157,12 @@ export class DatabaseStorage implements IStorage {
     const acceptedConns = conns.filter(c => c.status === "ACCEPTED");
     const dependents: User[] = [];
     for (const conn of acceptedConns) {
-      const user = await this.getUserById(conn.dependentId);
-      if (user) dependents.push(user);
+      try {
+        const user = await this.getUserById(conn.dependentId);
+        if (user) dependents.push(user);
+      } catch (err) {
+        console.error(`Failed to fetch dependent ${conn.dependentId}:`, err);
+      }
     }
     return dependents;
   }
