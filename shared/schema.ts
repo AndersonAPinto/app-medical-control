@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, bigint, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, bigint, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -50,6 +50,28 @@ export const connections = pgTable("connections", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const notifications = pgTable("notifications", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").notNull().default(false),
+  relatedId: text("related_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const pushTokens = pgTable("push_tokens", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  token: text("token").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   name: true,
   email: true,
@@ -97,3 +119,5 @@ export type Medication = typeof medications.$inferSelect;
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
 export type DoseSchedule = typeof doseSchedules.$inferSelect;
 export type Connection = typeof connections.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type PushToken = typeof pushTokens.$inferSelect;
