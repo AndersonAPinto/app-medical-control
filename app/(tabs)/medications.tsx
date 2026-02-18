@@ -267,6 +267,9 @@ export default function MedicationsScreen() {
               <Ionicons name="time-outline" size={56} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma dose registrada</Text>
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>O histórico de doses confirmadas aparecerá aqui</Text>
+              {historyQuery.isFetching && (
+                <ActivityIndicator size="small" color={colors.tint} style={{ marginTop: 12 }} />
+              )}
             </View>
           ) : (
             <FlatList
@@ -275,6 +278,14 @@ export default function MedicationsScreen() {
               renderItem={({ item }) => <HistoryItem entry={item} colors={colors} />}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              ListHeaderComponent={
+                historyQuery.isFetching && !historyQuery.isLoading ? (
+                  <View style={styles.refetchBar}>
+                    <ActivityIndicator size="small" color={colors.tint} />
+                    <Text style={[styles.refetchText, { color: colors.textSecondary }]}>Atualizando...</Text>
+                  </View>
+                ) : null
+              }
               refreshControl={
                 <RefreshControl
                   refreshing={historyQuery.isFetching}
@@ -460,5 +471,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     marginTop: 2,
+  },
+  refetchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  refetchText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
 });
