@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -146,6 +147,7 @@ export default function DashboardScreen() {
   const colors = isDark ? Colors.dark : Colors.light;
   const isMaster = user?.role === "MASTER";
   const [activeTab, setActiveTab] = useState<"meds" | "deps">("meds");
+  const [confirmMed, setConfirmMed] = useState<Medication | null>(null);
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
@@ -161,6 +163,7 @@ export default function DashboardScreen() {
       await apiRequest("POST", `/api/medications/${med.id}/take-dose`);
     },
     onSuccess: () => {
+      setConfirmMed(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/schedules/history"] });
@@ -168,7 +171,15 @@ export default function DashboardScreen() {
         queryClient.invalidateQueries({ queryKey: ["/api/dependents"] });
       }
     },
+    onError: () => {
+      setConfirmMed(null);
+    },
   });
+
+  const handleDosePress = useCallback((med: Medication) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setConfirmMed(med);
+  }, []);
 
   const medications = medsQuery.data || [];
   const dependents = dependentsQuery.data || [];
@@ -238,7 +249,7 @@ export default function DashboardScreen() {
         data={medications}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <MedicationCard med={item} onConfirmDose={(med) => confirmMutation.mutate(med)} colors={colors} />
+          <MedicationCard med={item} onConfirmDose={handleDosePress} colors={colors} />
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -390,6 +401,20 @@ export default function DashboardScreen() {
       )}
 
       {(!isMaster || activeTab === "meds") ? renderMedsContent() : renderDepsContent()}
+
+      <ConfirmDialog
+        visible={!!confirmMed}
+        title="Confirmar Dose"
+        message={confirmMed ? `Registrar dose de ${confirmMed.name} (${confirmMed.dosage})?\n\nEstoque atual: ${confirmMed.currentStock} un.` : ""}
+        icon="medical"
+        iconColor={colors.success}
+        confirmLabel="Tomei"
+        cancelLabel="Cancelar"
+        confirmColor={colors.success}
+        loading={confirmMutation.isPending}
+        onConfirm={() => { if (confirmMed) confirmMutation.mutate(confirmMed); }}
+        onCancel={() => { if (!confirmMutation.isPending) setConfirmMed(null); }}
+      />
     </View>
   );
 }
