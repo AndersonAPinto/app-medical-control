@@ -153,6 +153,11 @@ export default function DashboardScreen() {
     queryKey: ["/api/medications"],
   });
 
+  const unreadQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    refetchInterval: 30000,
+  });
+
   const dependentsQuery = useQuery<DependentSummary[]>({
     queryKey: ["/api/dependents"],
     enabled: isMaster,
@@ -167,6 +172,7 @@ export default function DashboardScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/schedules/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       if (isMaster) {
         queryClient.invalidateQueries({ queryKey: ["/api/dependents"] });
       }
@@ -313,14 +319,29 @@ export default function DashboardScreen() {
         style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 16 }]}
       >
         <View style={styles.headerRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>{greeting()}</Text>
             <Text style={styles.userName}>{user?.name || "Usuário"}</Text>
           </View>
-          <View style={styles.roleChip}>
-            <Text style={styles.roleChipText}>
-              {user?.role === "MASTER" ? "Responsavel" : user?.role === "DEPENDENT" ? "Dependente" : "Controle"}
-            </Text>
+          <View style={styles.headerRight}>
+            <Pressable
+              onPress={() => router.push("/notifications")}
+              style={({ pressed }) => [styles.bellBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Ionicons name="notifications-outline" size={24} color="#fff" />
+              {(unreadQuery.data?.count ?? 0) > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {(unreadQuery.data?.count ?? 0) > 99 ? "99+" : unreadQuery.data?.count}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+            <View style={styles.roleChip}>
+              <Text style={styles.roleChipText}>
+                {user?.role === "MASTER" ? "Responsavel" : user?.role === "DEPENDENT" ? "Dependente" : "Controle"}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -433,6 +454,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  bellBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    position: "absolute" as const,
+    top: 2,
+    right: 2,
+    backgroundColor: "#EF4444",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
   },
   greeting: {
     fontSize: 14,
