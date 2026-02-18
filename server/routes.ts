@@ -369,6 +369,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateMedicationStock(medId, med.currentStock - 1);
       }
 
+      const newStock = med.currentStock - 1;
+      try {
+        const conns = await storage.getConnectionsByDependent(userId);
+        const acceptedConns = conns.filter(c => c.status === "ACCEPTED");
+        const dependent = await storage.getUserById(userId);
+        if (dependent && acceptedConns.length > 0) {
+          if (newStock === 0) {
+            for (const conn of acceptedConns) {
+              await storage.createNotification({
+                userId: conn.masterId,
+                type: "STOCK_EMPTY",
+                title: "Estoque Zerado",
+                message: `${dependent.name}: ${med.name} sem estoque`,
+                relatedId: medId,
+              });
+            }
+          } else if (newStock > 0 && newStock <= med.alertThreshold) {
+            for (const conn of acceptedConns) {
+              await storage.createNotification({
+                userId: conn.masterId,
+                type: "STOCK_LOW",
+                title: "Estoque Baixo",
+                message: `${dependent.name}: ${med.name} com apenas ${newStock} unidades restantes`,
+                relatedId: medId,
+              });
+            }
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (take-dose):", notifError);
+      }
+
       res.status(201).json({
         schedule,
         medName: med.name,
@@ -457,6 +489,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const conn = await storage.createConnection(req.session.userId!, target.id);
+
+      try {
+        await storage.createNotification({
+          userId: target.id,
+          type: "CONNECTION_REQUEST",
+          title: "Solicitação de Conexão",
+          message: `${user.name} quer se conectar com você`,
+          relatedId: conn.id,
+        });
+      } catch (notifError) {
+        console.error("Notification error (create-connection):", notifError);
+      }
+
       res.status(201).json({
         ...conn,
         linkedName: target.name,
@@ -482,6 +527,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/connections/:id/accept", requireAuth, async (req: Request, res: Response) => {
     try {
       await storage.acceptConnection(req.params.id);
+
+      try {
+        const conns = await storage.getConnectionsByDependent(req.session.userId!);
+        const conn = conns.find(c => c.id === req.params.id);
+        if (conn) {
+          const dependent = await storage.getUserById(conn.dependentId);
+          if (dependent) {
+            await storage.createNotification({
+              userId: conn.masterId,
+              type: "CONNECTION_ACCEPTED",
+              title: "Conexão Aceita",
+              message: `${dependent.name} aceitou sua conexão`,
+              relatedId: conn.id,
+            });
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (accept-connection):", notifError);
+      }
+
       res.json({ message: "Connection accepted" });
     } catch (error) {
       console.error("Accept connection error:", error);
@@ -560,6 +625,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(enriched);
     } catch (error) {
       console.error("Get dependent history error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/notifications", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const notifs = await storage.getNotificationsByUser(req.session.userId!);
+      res.json(notifs);
+    } catch (error) {
+      console.error("Get notifications error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const count = await storage.getUnreadCountByUser(req.session.userId!);
+      res.json({ count });
+    } catch (error) {
+      console.error("Get unread count error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.markNotificationRead(req.params.id);
+      res.json({ message: "Notification marked as read" });
+    } catch (error) {
+      console.error("Mark notification read error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/notifications/read-all", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.markAllNotificationsRead(req.session.userId!);
+      res.json({ message: "All notifications marked as read" });
+    } catch (error) {
+      console.error("Mark all notifications read error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/push-tokens", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Token is required" });
+      }
+      const pushToken = await storage.registerPushToken(req.session.userId!, token);
+      res.status(201).json(pushToken);
+    } catch (error) {
+      console.error("Register push token error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });

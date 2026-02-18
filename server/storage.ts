@@ -5,13 +5,17 @@ import {
   type InsertMedication,
   type DoseSchedule,
   type Connection,
+  type Notification,
+  type PushToken,
   users,
   medications,
   doseSchedules,
   connections,
+  notifications,
+  pushTokens,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/neon-serverless";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import ws from "ws";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 
@@ -47,6 +51,13 @@ export interface IStorage {
   acceptConnection(id: string): Promise<void>;
   deleteConnection(id: string): Promise<void>;
   getDependentsForMaster(masterId: string): Promise<User[]>;
+  createNotification(data: { userId: string; type: string; title: string; message: string; relatedId?: string }): Promise<Notification>;
+  getNotificationsByUser(userId: string): Promise<Notification[]>;
+  getUnreadCountByUser(userId: string): Promise<number>;
+  markNotificationRead(id: string): Promise<void>;
+  markAllNotificationsRead(userId: string): Promise<void>;
+  registerPushToken(userId: string, token: string): Promise<PushToken>;
+  getPushTokensByUser(userId: string): Promise<PushToken[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -150,6 +161,39 @@ export class DatabaseStorage implements IStorage {
   async getSchedulesByOwnerWithStatus(ownerId: string, statuses: string[]): Promise<DoseSchedule[]> {
     const allSchedules = await db.select().from(doseSchedules).where(eq(doseSchedules.ownerId, ownerId)).orderBy(desc(doseSchedules.timeMillis));
     return allSchedules.filter(s => statuses.includes(s.status));
+  }
+
+  async createNotification(data: { userId: string; type: string; title: string; message: string; relatedId?: string }): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(data).returning();
+    return created;
+  }
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+  }
+
+  async getUnreadCountByUser(userId: string): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
+    return Number(result.count);
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db.update(notifications).set({ read: true }).where(eq(notifications.userId, userId));
+  }
+
+  async registerPushToken(userId: string, token: string): Promise<PushToken> {
+    const [existing] = await db.select().from(pushTokens).where(and(eq(pushTokens.userId, userId), eq(pushTokens.token, token)));
+    if (existing) return existing;
+    const [created] = await db.insert(pushTokens).values({ userId, token }).returning();
+    return created;
+  }
+
+  async getPushTokensByUser(userId: string): Promise<PushToken[]> {
+    return db.select().from(pushTokens).where(eq(pushTokens.userId, userId));
   }
 
   async getDependentsForMaster(masterId: string): Promise<User[]> {
