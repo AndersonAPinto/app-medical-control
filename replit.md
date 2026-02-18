@@ -4,6 +4,7 @@
 MedControl is a medication management mobile app built with Expo (React Native) and Express backend. It helps dependents take medications on time and allows a "Master" (responsible person) and "Control Contacts" to be notified if a dose is missed or stock runs out.
 
 ## Recent Changes
+- 2026-02-18: Added notification system: notifications table, push_tokens table, notification endpoints (list, mark read, unread count), event-driven notifications (stock low/empty → Masters, connection request/accepted), notifications screen with bell icon + badge on Dashboard
 - 2026-02-15: Added profile editing, UID copy, role switcher, connections management, premium upgrade flow, medication editing, and dose history tab
 - 2026-02-15: Initial project setup with auth, medications CRUD, dashboard, and profile screens
 
@@ -19,6 +20,8 @@ MedControl is a medication management mobile app built with Expo (React Native) 
 - **medications**: id, name, dosage, currentStock, alertThreshold, intervalInHours, ownerId
 - **dose_schedules**: id, medId, timeMillis, status (PENDING/TAKEN/MISSED), confirmedAt, ownerId
 - **connections**: id, masterId, dependentId, status (PENDING/ACCEPTED)
+- **notifications**: id, userId, type (STOCK_LOW/STOCK_EMPTY/CONNECTION_REQUEST/CONNECTION_ACCEPTED), title, message, read, relatedId, createdAt
+- **push_tokens**: id, userId, token, createdAt
 
 ## Key Routes
 - POST /api/auth/register - Register new user
@@ -43,6 +46,11 @@ MedControl is a medication management mobile app built with Expo (React Native) 
 - GET/POST /api/connections - List/Create user connections
 - DELETE /api/connections/:id - Remove connection
 - PATCH /api/connections/:id/accept - Accept pending connection
+- GET /api/notifications - List user notifications
+- GET /api/notifications/unread-count - Unread notification count
+- PATCH /api/notifications/:id/read - Mark notification as read
+- PATCH /api/notifications/read-all - Mark all notifications as read
+- POST /api/push-tokens - Register push token
 
 ## Screens
 - **Login** (/login): Email/password login
@@ -53,6 +61,7 @@ MedControl is a medication management mobile app built with Expo (React Native) 
 - **Connections** (/connections): Search/validate users, add/delete/accept connections
 - **Add Medication** (/add-medication): Modal form to create medication
 - **Edit Medication** (/edit-medication?id=xxx): Modal form to edit medication
+- **Notifications** (/notifications): Notification center with bell icon badge, mark as read, mark all
 
 ## Connection Logic
 - FREE plan: Max 1 dependent per Master
