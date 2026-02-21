@@ -57,6 +57,7 @@ function RootLayoutNav() {
           headerTitleStyle: { color: colors.text },
         }}
       />
+      <Stack.Screen name="onboarding" />
       <Stack.Screen name="connections" />
       <Stack.Screen name="dependent-detail" />
       <Stack.Screen name="notifications" />
