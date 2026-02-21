@@ -63,7 +63,7 @@ export default function RegisterScreen() {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
         <Text style={styles.headerTitle}>Criar Conta</Text>
-        <Text style={styles.headerSubtitle}>Junte-se ao MedControl</Text>
+        <Text style={styles.headerSubtitle}>Junte-se ao Toma Aí</Text>
       </LinearGradient>
 
       <KeyboardAvoidingView

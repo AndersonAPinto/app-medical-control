@@ -92,7 +92,7 @@ export default function SubscriptionScreen() {
             </View>
             <Text style={[styles.premiumActiveTitle, { color: colors.text }]}>Plano Premium Ativo</Text>
             <Text style={[styles.premiumActiveSubtitle, { color: colors.textSecondary }]}>
-              Você tem acesso a todos os recursos do MedControl Premium.
+              Você tem acesso a todos os recursos do Toma Aí Premium.
             </Text>
             <View style={styles.premiumFeaturesList}>
               {FEATURES_PREMIUM.map((f, i) => (
@@ -128,9 +128,9 @@ export default function SubscriptionScreen() {
           <View style={[styles.heroIcon, { backgroundColor: "#FEF3C7" }]}>
             <Ionicons name="star" size={40} color="#F59E0B" />
           </View>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>MedControl Premium</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>Toma Aí Premium</Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Desbloqueie todo o potencial do MedControl
+            Desbloqueie todo o potencial do Toma Aí
           </Text>
         </View>
 

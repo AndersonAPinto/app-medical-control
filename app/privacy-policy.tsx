@@ -38,7 +38,7 @@ export default function PrivacyPolicyScreen() {
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>1. Informações que Coletamos</Text>
         <Text style={[styles.paragraph, { color: colors.textSecondary }]}>
-          O MedControl coleta as seguintes informações para fornecer nossos serviços:
+          O Toma Aí coleta as seguintes informações para fornecer nossos serviços:
         </Text>
         <Text style={[styles.bullet, { color: colors.textSecondary }]}>• Nome, e-mail e senha para criação de conta</Text>
         <Text style={[styles.bullet, { color: colors.textSecondary }]}>• Informações sobre medicamentos (nome, dosagem, estoque)</Text>
@@ -90,7 +90,7 @@ export default function PrivacyPolicyScreen() {
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>9. Contato</Text>
         <Text style={[styles.paragraph, { color: colors.textSecondary }]}>
-          Para dúvidas sobre privacidade ou seus dados, entre em contato pelo e-mail: suporte@medcontrol.app
+          Para dúvidas sobre privacidade ou seus dados, entre em contato pelo e-mail: suporte@tomaai.app
         </Text>
       </ScrollView>
     </View>

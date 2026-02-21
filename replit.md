@@ -1,7 +1,7 @@
-# MedControl
+# Toma Aí
 
 ## Overview
-MedControl is a medication management mobile app built with Expo (React Native) and Express backend. It helps dependents take medications on time and allows a "Master" (responsible person) and "Control Contacts" to be notified if a dose is missed or stock runs out.
+Toma Aí is a medication management mobile app built with Expo (React Native) and Express backend. It helps dependents take medications on time and allows a "Master" (responsible person) and "Control Contacts" to be notified if a dose is missed or stock runs out.
 
 ## Recent Changes
 - 2026-02-21: Integrated RevenueCat for in-app subscriptions (monthly R$24.90 / yearly R$240 with 33% discount), subscription screen, privacy policy screen, FREE plan medication limit (max 10), dependent color-coded list, stock notifications to dependents + masters, subscription management in profile, app.json updated for Google Play (package com.medcontrol.app, versionCode, permissions)

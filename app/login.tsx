@@ -51,7 +51,7 @@ export default function LoginScreen() {
         <View style={styles.iconContainer}>
           <Ionicons name="medical" size={40} color="#fff" />
         </View>
-        <Text style={styles.brandTitle}>MedControl</Text>
+        <Text style={styles.brandTitle}>Toma Aí</Text>
         <Text style={styles.brandSubtitle}>Controle de medicamentos</Text>
       </LinearGradient>
 
