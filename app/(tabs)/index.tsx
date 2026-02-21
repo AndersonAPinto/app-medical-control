@@ -97,15 +97,18 @@ function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onCon
   );
 }
 
-function DependentCard({ dep, colors }: { dep: DependentSummary; colors: typeof Colors.light }) {
+function DependentCard({ dep, index, colors, isDark }: { dep: DependentSummary; index: number; colors: typeof Colors.light; isDark: boolean }) {
+  const depColors = isDark ? Colors.dependentColorsDark : Colors.dependentColors;
+  const colorSet = depColors[index % depColors.length];
+
   return (
     <Pressable
-      style={({ pressed }) => [styles.depCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow), pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.depCard, { backgroundColor: colors.surface, borderLeftWidth: 4, borderLeftColor: colorSet.accent }, cardShadow(colors.cardShadow), pressed && styles.cardPressed]}
       onPress={() => router.push({ pathname: "/dependent-detail", params: { id: dep.id, name: dep.name } })}
     >
       <View style={styles.depCardLeft}>
-        <View style={[styles.depAvatar, { backgroundColor: colors.tintLight }]}>
-          <Text style={[styles.depAvatarText, { color: colors.tint }]}>
+        <View style={[styles.depAvatar, { backgroundColor: colorSet.bg }]}>
+          <Text style={[styles.depAvatarText, { color: colorSet.text }]}>
             {dep.name?.charAt(0)?.toUpperCase() || "?"}
           </Text>
         </View>
@@ -135,7 +138,7 @@ function DependentCard({ dep, colors }: { dep: DependentSummary; colors: typeof 
         </View>
       </View>
 
-      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      <Ionicons name="chevron-forward" size={20} color={colorSet.accent} />
     </Pressable>
   );
 }
@@ -203,21 +206,12 @@ export default function DashboardScreen() {
     if (user?.planType === "FREE" && dependents.length >= 1) {
       Alert.alert(
         "Limite do Plano Free",
-        "Você atingiu o limite de 1 dependente do plano gratuito. Faça upgrade para Premium para monitorar dependentes ilimitados.",
+        "Você atingiu o limite de 1 dependente do plano gratuito. Assine o Premium para monitorar dependentes ilimitados.",
         [
           { text: "Cancelar", style: "cancel" },
           {
-            text: "Fazer Upgrade",
-            onPress: async () => {
-              try {
-                await apiRequest("POST", "/api/auth/upgrade");
-                await refreshUser();
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                Alert.alert("Sucesso", "Plano atualizado para Premium!");
-              } catch (e: any) {
-                Alert.alert("Erro", e.message || "Não foi possível realizar o upgrade.");
-              }
-            },
+            text: "Ver Planos",
+            onPress: () => router.push("/subscription"),
           },
         ]
       );
@@ -298,7 +292,7 @@ export default function DashboardScreen() {
       <FlatList
         data={dependents}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <DependentCard dep={item} colors={colors} />}
+        renderItem={({ item, index }) => <DependentCard dep={item} index={index} colors={colors} isDark={isDark} />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={

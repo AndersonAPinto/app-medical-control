@@ -169,6 +169,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/sync-plan", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { planType } = req.body;
+      if (!planType || !["FREE", "PREMIUM"].includes(planType)) {
+        return res.status(400).json({ message: "Invalid plan type" });
+      }
+      const updated = await storage.updateUser(req.session.userId!, { planType });
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Sync plan error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.get("/api/users/search/:identifier", requireAuth, async (req: Request, res: Response) => {
     try {
       const { identifier } = req.params;
@@ -214,6 +229,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsed = insertMedicationSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten() });
+      }
+
+      const user = await storage.getUserById(req.session.userId!);
+      if (user && user.planType === "FREE") {
+        const existingMeds = await storage.getMedicationsByOwner(req.session.userId!);
+        if (existingMeds.length >= 10) {
+          return res.status(403).json({
+            message: "Limite de 10 medicamentos atingido no plano Free. Assine o Premium para adicionar medicamentos ilimitados.",
+            requiresUpgrade: true,
+          });
+        }
       }
 
       const med = await storage.createMedication({
@@ -374,8 +400,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const conns = await storage.getConnectionsByDependent(userId);
         const acceptedConns = conns.filter(c => c.status === "ACCEPTED");
         const dependent = await storage.getUserById(userId);
-        if (dependent && acceptedConns.length > 0) {
-          if (newStock === 0) {
+
+        if (newStock === 0) {
+          await storage.createNotification({
+            userId,
+            type: "STOCK_EMPTY",
+            title: "Estoque Zerado",
+            message: `${med.name} está sem estoque. Reponha o quanto antes.`,
+            relatedId: medId,
+          });
+          if (dependent && acceptedConns.length > 0) {
             for (const conn of acceptedConns) {
               await storage.createNotification({
                 userId: conn.masterId,
@@ -385,7 +419,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 relatedId: medId,
               });
             }
-          } else if (newStock > 0 && newStock <= med.alertThreshold) {
+          }
+        } else if (newStock > 0 && newStock <= med.alertThreshold) {
+          await storage.createNotification({
+            userId,
+            type: "STOCK_LOW",
+            title: "Estoque Baixo",
+            message: `${med.name} com apenas ${newStock} unidades restantes`,
+            relatedId: medId,
+          });
+          if (dependent && acceptedConns.length > 0) {
             for (const conn of acceptedConns) {
               await storage.createNotification({
                 userId: conn.masterId,

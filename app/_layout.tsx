@@ -7,6 +7,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/lib/auth-context";
+import { SubscriptionProvider } from "@/lib/subscription-context";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import Colors from "@/constants/colors";
@@ -59,6 +60,8 @@ function RootLayoutNav() {
       <Stack.Screen name="connections" />
       <Stack.Screen name="dependent-detail" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="subscription" />
+      <Stack.Screen name="privacy-policy" />
     </Stack>
   );
 }
@@ -86,7 +89,9 @@ export default function RootLayout() {
           <KeyboardProvider>
             <ThemeProvider>
               <AuthProvider>
-                <RootLayoutNav />
+                <SubscriptionProvider>
+                  <RootLayoutNav />
+                </SubscriptionProvider>
               </AuthProvider>
             </ThemeProvider>
           </KeyboardProvider>

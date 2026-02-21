@@ -14,11 +14,12 @@ import {
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
+import { useAuth } from "@/lib/auth-context";
 
 const intervals = [
   { label: "4h", value: 4 },
@@ -32,11 +33,20 @@ export default function AddMedicationScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const { user } = useAuth();
   const [name, setName] = useState("");
   const [dosage, setDosage] = useState("");
   const [currentStock, setCurrentStock] = useState("");
   const [alertThreshold, setAlertThreshold] = useState("5");
   const [intervalInHours, setIntervalInHours] = useState(8);
+
+  const medsQuery = useQuery<any[]>({
+    queryKey: ["/api/medications"],
+  });
+
+  const medCount = medsQuery.data?.length || 0;
+  const isFree = user?.planType === "FREE";
+  const atLimit = isFree && medCount >= 10;
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -55,7 +65,19 @@ export default function AddMedicationScreen() {
       router.back();
     },
     onError: (err: any) => {
-      Alert.alert("Erro", err.message || "Falha ao salvar medicamento");
+      const msg = err.message || "";
+      if (msg.includes("requiresUpgrade") || msg.includes("Limite")) {
+        Alert.alert(
+          "Limite Atingido",
+          "Você atingiu o limite de 10 medicamentos do plano Free. Assine o Premium para adicionar medicamentos ilimitados.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            { text: "Ver Planos", onPress: () => { router.back(); router.push("/subscription"); } },
+          ]
+        );
+      } else {
+        Alert.alert("Erro", msg || "Falha ao salvar medicamento");
+      }
     },
   });
 
@@ -66,6 +88,17 @@ export default function AddMedicationScreen() {
     }
     if (!dosage.trim()) {
       Alert.alert("Erro", "Informe a dosagem");
+      return;
+    }
+    if (atLimit) {
+      Alert.alert(
+        "Limite Atingido",
+        "Você atingiu o limite de 10 medicamentos do plano Free. Assine o Premium para adicionar medicamentos ilimitados.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Ver Planos", onPress: () => { router.back(); router.push("/subscription"); } },
+        ]
+      );
       return;
     }
     createMutation.mutate();
@@ -87,6 +120,14 @@ export default function AddMedicationScreen() {
             <Ionicons name="medical" size={36} color={colors.tint} />
           </View>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Adicione os detalhes do medicamento</Text>
+          {isFree && (
+            <View style={[styles.limitBanner, { backgroundColor: atLimit ? colors.dangerLight : colors.warningLight }]}>
+              <Ionicons name={atLimit ? "alert-circle" : "information-circle"} size={16} color={atLimit ? colors.danger : colors.warning} />
+              <Text style={[styles.limitText, { color: atLimit ? colors.danger : colors.warning }]}>
+                {atLimit ? "Limite de 10 medicamentos atingido" : `${medCount}/10 medicamentos (Plano Free)`}
+              </Text>
+            </View>
+          )}
         </View>
 
         <Text style={[styles.label, { color: colors.text }]}>Nome do medicamento</Text>
@@ -220,6 +261,19 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
+  },
+  limitBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+    gap: 6,
+  },
+  limitText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   label: {
     fontSize: 13,

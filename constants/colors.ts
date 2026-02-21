@@ -68,8 +68,36 @@ const dark: typeof light = {
   cardShadow: "rgba(0, 0, 0, 0.3)",
 };
 
+const dependentColors = [
+  { bg: "#DBEAFE", text: "#2563EB", accent: "#3B82F6" },
+  { bg: "#FCE7F3", text: "#DB2777", accent: "#EC4899" },
+  { bg: "#D1FAE5", text: "#059669", accent: "#10B981" },
+  { bg: "#FEF3C7", text: "#D97706", accent: "#F59E0B" },
+  { bg: "#E0E7FF", text: "#4F46E5", accent: "#6366F1" },
+  { bg: "#FEE2E2", text: "#DC2626", accent: "#EF4444" },
+  { bg: "#CCFBF1", text: "#0D9488", accent: "#14B8A6" },
+  { bg: "#F3E8FF", text: "#7C3AED", accent: "#8B5CF6" },
+  { bg: "#FFEDD5", text: "#EA580C", accent: "#F97316" },
+  { bg: "#CFFAFE", text: "#0891B2", accent: "#06B6D4" },
+];
+
+const dependentColorsDark = [
+  { bg: "rgba(37, 99, 235, 0.15)", text: "#60A5FA", accent: "#3B82F6" },
+  { bg: "rgba(219, 39, 119, 0.15)", text: "#F472B6", accent: "#EC4899" },
+  { bg: "rgba(5, 150, 105, 0.15)", text: "#34D399", accent: "#10B981" },
+  { bg: "rgba(217, 119, 6, 0.15)", text: "#FBBF24", accent: "#F59E0B" },
+  { bg: "rgba(79, 70, 229, 0.15)", text: "#818CF8", accent: "#6366F1" },
+  { bg: "rgba(220, 38, 38, 0.15)", text: "#F87171", accent: "#EF4444" },
+  { bg: "rgba(13, 148, 136, 0.15)", text: "#2DD4BF", accent: "#14B8A6" },
+  { bg: "rgba(124, 58, 237, 0.15)", text: "#A78BFA", accent: "#8B5CF6" },
+  { bg: "rgba(234, 88, 12, 0.15)", text: "#FB923C", accent: "#F97316" },
+  { bg: "rgba(8, 145, 178, 0.15)", text: "#22D3EE", accent: "#06B6D4" },
+];
+
 export default {
   light,
   dark,
   palette,
+  dependentColors,
+  dependentColorsDark,
 };

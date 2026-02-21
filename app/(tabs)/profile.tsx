@@ -35,7 +35,7 @@ export default function ProfileScreen() {
 
   const [rolePickerVisible, setRolePickerVisible] = useState(false);
   const [changingRole, setChangingRole] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
+  const upgrading = false;
   const [themePickerVisible, setThemePickerVisible] = useState(false);
 
   const handleLogout = () => {
@@ -102,33 +102,7 @@ export default function ProfileScreen() {
 
   const handlePlanPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (user?.planType === "PREMIUM") {
-      Alert.alert("Plano Premium", "Você já é um usuário Premium!");
-      return;
-    }
-    Alert.alert(
-      "Upgrade para Premium",
-      "Desbloqueie recursos ilimitados, conexões e muito mais por R$9,90/mes.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Fazer Upgrade",
-          onPress: async () => {
-            setUpgrading(true);
-            try {
-              await apiRequest("POST", "/api/auth/upgrade");
-              await refreshUser();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Sucesso", "Parabens! Seu plano foi atualizado para Premium.");
-            } catch (e: any) {
-              Alert.alert("Erro", e.message || "Não foi possível realizar o upgrade.");
-            } finally {
-              setUpgrading(false);
-            }
-          },
-        },
-      ]
-    );
+    router.push("/subscription");
   };
 
   const handleConnectionsPress = () => {
@@ -229,6 +203,16 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </Pressable>
+
+            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+            <Pressable style={styles.menuItem} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/privacy-policy"); }}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.inputBg }]}>
+                <Ionicons name="document-text-outline" size={18} color={colors.textSecondary} />
+              </View>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Política de Privacidade</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
