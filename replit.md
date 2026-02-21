@@ -4,6 +4,7 @@
 MedControl is a medication management mobile app built with Expo (React Native) and Express backend. It helps dependents take medications on time and allows a "Master" (responsible person) and "Control Contacts" to be notified if a dose is missed or stock runs out.
 
 ## Recent Changes
+- 2026-02-21: Integrated RevenueCat for in-app subscriptions (monthly R$24.90 / yearly R$240 with 33% discount), subscription screen, privacy policy screen, FREE plan medication limit (max 10), dependent color-coded list, stock notifications to dependents + masters, subscription management in profile, app.json updated for Google Play (package com.medcontrol.app, versionCode, permissions)
 - 2026-02-18: Added notification system: notifications table, push_tokens table, notification endpoints (list, mark read, unread count), event-driven notifications (stock low/empty → Masters, connection request/accepted), notifications screen with bell icon + badge on Dashboard
 - 2026-02-15: Added profile editing, UID copy, role switcher, connections management, premium upgrade flow, medication editing, and dose history tab
 - 2026-02-15: Initial project setup with auth, medications CRUD, dashboard, and profile screens
@@ -62,6 +63,13 @@ MedControl is a medication management mobile app built with Expo (React Native) 
 - **Add Medication** (/add-medication): Modal form to create medication
 - **Edit Medication** (/edit-medication?id=xxx): Modal form to edit medication
 - **Notifications** (/notifications): Notification center with bell icon badge, mark as read, mark all
+- **Subscription** (/subscription): RevenueCat subscription plans (monthly R$24.90, yearly R$240), plan comparison
+- **Privacy Policy** (/privacy-policy): App privacy policy for Google Play compliance
+
+## Subscription (RevenueCat)
+- Provider: RevenueCat (Google Play Billing compliant)
+- Context: SubscriptionProvider wraps app, provides useSubscription hook
+- Endpoint: POST /api/auth/sync-plan - Syncs RevenueCat subscription status with backend planType
 
 ## Connection Logic
 - FREE plan: Max 1 dependent per Master
