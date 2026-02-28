@@ -6,6 +6,8 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
+  PixelRatio,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeOut, ZoomIn } from "react-native-reanimated";
@@ -45,9 +47,11 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const { isDark } = useTheme();
+  const { width } = useWindowDimensions();
   const colors = isDark ? Colors.dark : Colors.light;
   const accentColor = confirmColor || colors.success;
   const resolvedIconColor = iconColor || accentColor;
+  const shouldStackActions = width < 360 || PixelRatio.getFontScale() > 1.15;
 
   return (
     <Modal
@@ -92,19 +96,25 @@ export default function ConfirmDialog({
             {message}
           </Text>
 
-          <View style={styles.actions}>
+          <View style={[styles.actions, shouldStackActions && styles.actionsStacked]}>
             {!singleAction && (
               <Pressable
                 style={({ pressed }) => [
                   styles.btn,
                   styles.cancelBtn,
+                  shouldStackActions && styles.stackedBtn,
                   { backgroundColor: colors.inputBg, borderColor: colors.border },
                   pressed && { opacity: 0.7 },
                 ]}
                 onPress={onCancel}
                 disabled={loading}
               >
-                <Text style={[styles.btnText, { color: colors.textSecondary }]}>
+                <Text
+                  style={[styles.btnText, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
                   {cancelLabel}
                 </Text>
               </Pressable>
@@ -114,7 +124,8 @@ export default function ConfirmDialog({
               style={({ pressed }) => [
                 styles.btn,
                 styles.confirmBtn,
-                singleAction && styles.singleBtn,
+                (singleAction || shouldStackActions) && styles.singleBtn,
+                shouldStackActions && styles.stackedBtn,
                 { backgroundColor: accentColor },
                 pressed && { opacity: 0.8 },
                 loading && { opacity: 0.6 },
@@ -125,7 +136,12 @@ export default function ConfirmDialog({
               {loading ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={[styles.btnText, { color: "#fff" }]}>
+                <Text
+                  style={[styles.btnText, { color: "#fff" }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
                   {confirmLabel}
                 </Text>
               )}
@@ -142,7 +158,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
   },
   backdropFill: {
     ...StyleSheet.absoluteFillObject,
@@ -150,12 +166,12 @@ const styles = StyleSheet.create({
   },
   dialog: {
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 380,
     borderRadius: 20,
     paddingTop: 28,
     paddingBottom: 20,
-    paddingHorizontal: 24,
-    alignItems: "center",
+    paddingHorizontal: 20,
+    alignItems: "stretch",
   },
   iconContainer: {
     width: 64,
@@ -164,27 +180,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
+    alignSelf: "center",
   },
   title: {
     fontSize: 18,
     fontWeight: "700" as const,
     textAlign: "center",
     marginBottom: 6,
+    alignSelf: "center",
   },
   message: {
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
     marginBottom: 24,
+    alignSelf: "center",
   },
   actions: {
     flexDirection: "row",
     gap: 10,
     width: "100%",
   },
+  actionsStacked: {
+    flexDirection: "column",
+  },
   btn: {
     flex: 1,
-    height: 46,
+    minHeight: 46,
+    paddingHorizontal: 12,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
@@ -197,8 +220,15 @@ const styles = StyleSheet.create({
     flex: undefined,
     width: "100%",
   },
+  stackedBtn: {
+    flex: undefined,
+    width: "100%",
+  },
   btnText: {
     fontSize: 15,
     fontWeight: "600" as const,
+    textAlign: "center",
+    flexShrink: 1,
+    includeFontPadding: false,
   },
 });

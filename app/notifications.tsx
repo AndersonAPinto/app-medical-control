@@ -163,17 +163,25 @@ export default function NotificationsScreen() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} hitSlop={8}>
+        <Pressable style={styles.headerSideBtn} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Notificações</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+          Notificações
+        </Text>
         <Pressable
+          style={styles.headerAction}
           onPress={() => markAllReadMutation.mutate()}
           disabled={markAllReadMutation.isPending}
           hitSlop={8}
         >
-          <Text style={[styles.markAllText, { color: colors.tint }, markAllReadMutation.isPending && { opacity: 0.5 }]}>
-            Marcar todas
+          <Text
+            style={[styles.markAllText, { color: colors.tint }, markAllReadMutation.isPending && { opacity: 0.5 }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
+            Marcar como lidas
           </Text>
         </Pressable>
       </View>
@@ -220,18 +228,31 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
+  headerSideBtn: {
+    width: 28,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
   headerTitle: {
+    flex: 1,
     fontSize: 17,
     fontFamily: "Inter_600SemiBold",
+    textAlign: "center",
+    marginHorizontal: 10,
+  },
+  headerAction: {
+    minWidth: 110,
+    maxWidth: "45%",
+    alignItems: "flex-end",
   },
   markAllText: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
+    textAlign: "right",
   },
   loadingContainer: {
     flex: 1,
