@@ -14,28 +14,49 @@ declare module "http" {
 }
 
 function setupCors(app: express.Application) {
+  const allowedOrigins = new Set<string>();
+
+  const appAllowedOrigins = process.env.APP_ALLOWED_ORIGINS;
+  if (appAllowedOrigins) {
+    appAllowedOrigins
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .forEach((origin) => allowedOrigins.add(origin));
+  }
+
+  // Backward compatibility while migrating away from Replit.
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    allowedOrigins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
+  }
+  if (process.env.REPLIT_DOMAINS) {
+    process.env.REPLIT_DOMAINS.split(",").forEach((domain) => {
+      allowedOrigins.add(`https://${domain.trim()}`);
+    });
+  }
+
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction && allowedOrigins.size === 0) {
+    log(
+      "APP_ALLOWED_ORIGINS is empty in production; web clients may be blocked by CORS.",
+    );
+  }
+
   app.use((req, res, next) => {
-    const origins = new Set<string>();
-
-    if (process.env.REPLIT_DEV_DOMAIN) {
-      origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
-    }
-
-    if (process.env.REPLIT_DOMAINS) {
-      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
-        origins.add(`https://${d.trim()}`);
-      });
-    }
-
     const origin = req.header("origin");
 
-    // Allow localhost origins for Expo web development (any port)
+    // Allow localhost origins for Expo web development (any port) outside prod.
     const isLocalhost =
       origin?.startsWith("http://localhost:") ||
       origin?.startsWith("http://127.0.0.1:");
 
-    if (origin && (origins.has(origin) || isLocalhost)) {
+    const originAllowed =
+      origin &&
+      (allowedOrigins.has(origin) || (!isProduction && Boolean(isLocalhost)));
+
+    if (originAllowed) {
       res.header("Access-Control-Allow-Origin", origin);
+      res.header("Vary", "Origin");
       res.header(
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, PATCH, DELETE, OPTIONS",
@@ -229,6 +250,9 @@ function setupErrorHandler(app: express.Application) {
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
 
   configureExpoAndLanding(app);
 

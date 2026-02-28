@@ -28,6 +28,15 @@ function requireAuth(req: Request, res: Response, next: () => void) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction && !process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET must be set in production");
+  }
+
+  if (isProduction) {
+    app.set("trust proxy", 1);
+  }
+
   const PgSession = connectPgSimple(session);
 
   app.use(
@@ -37,13 +46,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET || "medcontrol-secret-key",
+      name: "toma.sid",
+      proxy: isProduction,
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false,
+        secure: isProduction,
         httpOnly: true,
         maxAge: 30 * 24 * 60 * 60 * 1000,
-        sameSite: "lax",
+        sameSite: isProduction ? "none" : "lax",
       },
     })
   );
