@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const intervals = [
   { label: "4h", value: 4 },
@@ -50,6 +51,11 @@ export default function EditMedicationScreen() {
   const [alertThreshold, setAlertThreshold] = useState("");
   const [intervalInHours, setIntervalInHours] = useState(8);
   const [loaded, setLoaded] = useState(false);
+  const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
+
+  const showError = (message: string) => {
+    setDialog({ title: "Não foi possível atualizar", message });
+  };
 
   const medQuery = useQuery<Medication>({
     queryKey: ["/api/medications", id],
@@ -85,17 +91,17 @@ export default function EditMedicationScreen() {
       router.back();
     },
     onError: (err: any) => {
-      Alert.alert("Erro", err.message || "Falha ao atualizar medicamento");
+      showError(err.message || "Falha ao atualizar medicamento");
     },
   });
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert("Erro", "Informe o nome do medicamento");
+      showError("Informe o nome do medicamento");
       return;
     }
     if (!dosage.trim()) {
-      Alert.alert("Erro", "Informe a dosagem");
+      showError("Informe a dosagem");
       return;
     }
     updateMutation.mutate();
@@ -264,6 +270,19 @@ export default function EditMedicationScreen() {
           )}
         </Pressable>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={!!dialog}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        icon="alert-circle"
+        iconColor={colors.danger}
+        confirmLabel="OK"
+        confirmColor={colors.danger}
+        singleAction
+        onConfirm={() => setDialog(null)}
+        onCancel={() => setDialog(null)}
+      />
     </KeyboardAvoidingView>
   );
 }

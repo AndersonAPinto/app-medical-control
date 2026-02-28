@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
@@ -17,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -25,10 +25,15 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
+
+  const showError = (message: string) => {
+    setDialog({ title: "Não foi possível entrar", message });
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Erro", "Preencha todos os campos");
+      showError("Preencha todos os campos");
       return;
     }
     setLoading(true);
@@ -36,7 +41,7 @@ export default function LoginScreen() {
       await login(email.trim(), password);
       router.replace("/(tabs)");
     } catch (err: any) {
-      Alert.alert("Erro", err.message || "Falha ao entrar");
+      showError(err.message || "Falha ao entrar");
     } finally {
       setLoading(false);
     }
@@ -121,6 +126,19 @@ export default function LoginScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmDialog
+        visible={!!dialog}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        icon="alert-circle"
+        iconColor={Colors.light.danger}
+        confirmLabel="OK"
+        confirmColor={Colors.light.danger}
+        singleAction
+        onConfirm={() => setDialog(null)}
+        onCancel={() => setDialog(null)}
+      />
     </View>
   );
 }

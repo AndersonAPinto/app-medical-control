@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Platform,
@@ -20,6 +19,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const intervals = [
   { label: "4h", value: 4 },
@@ -39,6 +39,17 @@ export default function AddMedicationScreen() {
   const [currentStock, setCurrentStock] = useState("");
   const [alertThreshold, setAlertThreshold] = useState("5");
   const [intervalInHours, setIntervalInHours] = useState(8);
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+    icon?: keyof typeof Ionicons.glyphMap;
+    iconColor?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    confirmColor?: string;
+    singleAction?: boolean;
+    onConfirm?: () => void;
+  } | null>(null);
 
   const medsQuery = useQuery<any[]>({
     queryKey: ["/api/medications"],
@@ -47,6 +58,42 @@ export default function AddMedicationScreen() {
   const medCount = medsQuery.data?.length || 0;
   const isFree = user?.planType === "FREE";
   const atLimit = isFree && medCount >= 10;
+
+  const showInfoDialog = (
+    title: string,
+    message: string,
+    icon: keyof typeof Ionicons.glyphMap = "information-circle",
+    iconColor: string = colors.tint,
+    confirmColor: string = colors.tint
+  ) => {
+    setDialog({
+      title,
+      message,
+      icon,
+      iconColor,
+      confirmLabel: "OK",
+      confirmColor,
+      singleAction: true,
+      onConfirm: () => setDialog(null),
+    });
+  };
+
+  const showLimitDialog = () => {
+    setDialog({
+      title: "Limite Atingido",
+      message: "Você atingiu o limite de 10 medicamentos do plano Free. Assine o Premium para adicionar medicamentos ilimitados.",
+      icon: "star",
+      iconColor: colors.warning,
+      confirmLabel: "Ver Planos",
+      cancelLabel: "Cancelar",
+      confirmColor: colors.warning,
+      onConfirm: () => {
+        setDialog(null);
+        router.back();
+        router.push("/subscription");
+      },
+    });
+  };
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -67,38 +114,24 @@ export default function AddMedicationScreen() {
     onError: (err: any) => {
       const msg = err.message || "";
       if (msg.includes("requiresUpgrade") || msg.includes("Limite")) {
-        Alert.alert(
-          "Limite Atingido",
-          "Você atingiu o limite de 10 medicamentos do plano Free. Assine o Premium para adicionar medicamentos ilimitados.",
-          [
-            { text: "Cancelar", style: "cancel" },
-            { text: "Ver Planos", onPress: () => { router.back(); router.push("/subscription"); } },
-          ]
-        );
+        showLimitDialog();
       } else {
-        Alert.alert("Erro", msg || "Falha ao salvar medicamento");
+        showInfoDialog("Não foi possível salvar", msg || "Falha ao salvar medicamento", "alert-circle", colors.danger, colors.danger);
       }
     },
   });
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert("Erro", "Informe o nome do medicamento");
+      showInfoDialog("Campo obrigatório", "Informe o nome do medicamento", "alert-circle", colors.danger, colors.danger);
       return;
     }
     if (!dosage.trim()) {
-      Alert.alert("Erro", "Informe a dosagem");
+      showInfoDialog("Campo obrigatório", "Informe a dosagem", "alert-circle", colors.danger, colors.danger);
       return;
     }
     if (atLimit) {
-      Alert.alert(
-        "Limite Atingido",
-        "Você atingiu o limite de 10 medicamentos do plano Free. Assine o Premium para adicionar medicamentos ilimitados.",
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Ver Planos", onPress: () => { router.back(); router.push("/subscription"); } },
-        ]
-      );
+      showLimitDialog();
       return;
     }
     createMutation.mutate();
@@ -235,6 +268,26 @@ export default function AddMedicationScreen() {
           )}
         </Pressable>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={!!dialog}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        icon={dialog?.icon}
+        iconColor={dialog?.iconColor}
+        confirmLabel={dialog?.confirmLabel}
+        cancelLabel={dialog?.cancelLabel}
+        confirmColor={dialog?.confirmColor}
+        singleAction={dialog?.singleAction}
+        onConfirm={() => {
+          if (dialog?.onConfirm) {
+            dialog.onConfirm();
+            return;
+          }
+          setDialog(null);
+        }}
+        onCancel={() => setDialog(null)}
+      />
     </KeyboardAvoidingView>
   );
 }

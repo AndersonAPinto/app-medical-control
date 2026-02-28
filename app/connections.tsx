@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   FlatList,
   Platform,
@@ -21,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { cardShadow } from "@/lib/shadows";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface Connection {
   id: string;
@@ -127,6 +127,37 @@ export default function ConnectionsScreen() {
   const [searching, setSearching] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+    icon?: keyof typeof Ionicons.glyphMap;
+    iconColor?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    confirmColor?: string;
+    singleAction?: boolean;
+    loading?: boolean;
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const showInfoDialog = (
+    title: string,
+    message: string,
+    icon: keyof typeof Ionicons.glyphMap = "information-circle",
+    iconColor: string = colors.tint,
+    confirmColor: string = colors.tint
+  ) => {
+    setDialog({
+      title,
+      message,
+      icon,
+      iconColor,
+      confirmLabel: "OK",
+      confirmColor,
+      singleAction: true,
+      onConfirm: () => setDialog(null),
+    });
+  };
 
   const connectionsQuery = useQuery<Connection[]>({
     queryKey: ["/api/connections"],
@@ -144,48 +175,41 @@ export default function ConnectionsScreen() {
     },
     onError: (err: any) => {
       const msg = err.message || "";
-      if (msg.includes("403") && msg.includes("requiresUpgrade")) {
+      if (msg.includes("requiresUpgrade") || msg.includes("Limite")) {
         showUpgradeDialog();
       } else {
-        try {
-          const parsed = JSON.parse(msg.split(": ").slice(1).join(": "));
-          if (parsed.requiresUpgrade) {
-            showUpgradeDialog();
-            return;
-          }
-        } catch {}
-        Alert.alert("Erro", "Não foi possível criar a conexão.");
+        showInfoDialog("Não foi possível criar conexão", "Não foi possível criar a conexão.", "alert-circle", colors.danger, colors.danger);
       }
     },
   });
 
   const showUpgradeDialog = () => {
-    Alert.alert(
-      "Limite do Plano Free",
-      "Você atingiu o limite de conexões do plano gratuito. Faça upgrade para Premium para conexões ilimitadas.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Fazer Upgrade",
-          onPress: async () => {
-            try {
-              await apiRequest("POST", "/api/auth/upgrade");
-              await refreshUser();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Sucesso", "Plano atualizado para Premium!");
-            } catch (e: any) {
-              Alert.alert("Erro", e.message || "Não foi possível realizar o upgrade.");
-            }
-          },
-        },
-      ]
-    );
+    setDialog({
+      title: "Limite do Plano Free",
+      message: "Você atingiu o limite de conexões do plano gratuito. Faça upgrade para Premium para conexões ilimitadas.",
+      icon: "star",
+      iconColor: colors.warning,
+      confirmLabel: "Fazer Upgrade",
+      cancelLabel: "Cancelar",
+      confirmColor: colors.warning,
+      onConfirm: async () => {
+        setDialog((prev) => (prev ? { ...prev, loading: true } : prev));
+        try {
+          await apiRequest("POST", "/api/auth/upgrade");
+          await refreshUser();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showInfoDialog("Sucesso", "Plano atualizado para Premium!", "checkmark-circle", colors.success, colors.success);
+        } catch (e: any) {
+          showInfoDialog("Não foi possível fazer upgrade", e.message || "Não foi possível realizar o upgrade.", "alert-circle", colors.danger, colors.danger);
+        }
+      },
+    });
   };
 
   const handleSearch = async () => {
     const identifier = searchText.trim();
     if (!identifier) {
-      Alert.alert("Erro", "Informe um ID ou email para buscar.");
+      showInfoDialog("Campo obrigatório", "Informe um ID ou email para buscar.", "alert-circle", colors.danger, colors.danger);
       return;
     }
     setSearching(true);
@@ -195,23 +219,25 @@ export default function ConnectionsScreen() {
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      Alert.alert(
-        "Conectar",
-        `Deseja conectar-se com ${foundUser.name}?\n\nFunção: ${ROLE_LABELS[foundUser.role] || foundUser.role}\nEmail: ${foundUser.email}`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Conectar",
-            onPress: () => addMutation.mutate(foundUser.id),
-          },
-        ]
-      );
+      setDialog({
+        title: "Conectar",
+        message: `Deseja conectar-se com ${foundUser.name}?\n\nFunção: ${ROLE_LABELS[foundUser.role] || foundUser.role}\nEmail: ${foundUser.email}`,
+        icon: "link",
+        iconColor: colors.tint,
+        confirmLabel: "Conectar",
+        cancelLabel: "Cancelar",
+        confirmColor: colors.tint,
+        onConfirm: () => {
+          setDialog(null);
+          addMutation.mutate(foundUser.id);
+        },
+      });
     } catch (err: any) {
       const msg = err.message || "";
       if (msg.includes("404")) {
-        Alert.alert("Não encontrado", "Nenhum usuário encontrado com esse ID ou email.");
+        showInfoDialog("Não encontrado", "Nenhum usuário encontrado com esse ID ou email.", "search", colors.warning, colors.warning);
       } else {
-        Alert.alert("Erro", "Não foi possível buscar o usuário.");
+        showInfoDialog("Não foi possível buscar", "Não foi possível buscar o usuário.", "alert-circle", colors.danger, colors.danger);
       }
     } finally {
       setSearching(false);
@@ -219,54 +245,55 @@ export default function ConnectionsScreen() {
   };
 
   const handleDelete = (connectionId: string) => {
-    Alert.alert(
-      "Remover Conexão",
-      "Deseja realmente remover esta conexão?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Remover",
-          style: "destructive",
-          onPress: async () => {
-            setDeletingId(connectionId);
-            try {
-              await apiRequest("DELETE", `/api/connections/${connectionId}`);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
-            } catch (e: any) {
-              Alert.alert("Erro", e.message || "Não foi possível remover a conexão.");
-            } finally {
-              setDeletingId(null);
-            }
-          },
-        },
-      ]
-    );
+    setDialog({
+      title: "Remover Conexao",
+      message: "Deseja realmente remover esta conexão?",
+      icon: "trash-outline",
+      iconColor: colors.danger,
+      confirmLabel: "Remover",
+      cancelLabel: "Cancelar",
+      confirmColor: colors.danger,
+      onConfirm: async () => {
+        setDialog((prev) => (prev ? { ...prev, loading: true } : prev));
+        setDeletingId(connectionId);
+        try {
+          await apiRequest("DELETE", `/api/connections/${connectionId}`);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+          setDialog(null);
+        } catch (e: any) {
+          showInfoDialog("Não foi possível remover", e.message || "Não foi possível remover a conexão.", "alert-circle", colors.danger, colors.danger);
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   const handleAccept = (connectionId: string) => {
-    Alert.alert(
-      "Aceitar Conexão",
-      "Deseja aceitar esta conexão?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Aceitar",
-          onPress: async () => {
-            setAcceptingId(connectionId);
-            try {
-              await apiRequest("PATCH", `/api/connections/${connectionId}/accept`);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
-            } catch (e: any) {
-              Alert.alert("Erro", e.message || "Não foi possível aceitar a conexão.");
-            } finally {
-              setAcceptingId(null);
-            }
-          },
-        },
-      ]
-    );
+    setDialog({
+      title: "Aceitar Conexao",
+      message: "Deseja aceitar esta conexão?",
+      icon: "checkmark-circle",
+      iconColor: colors.success,
+      confirmLabel: "Aceitar",
+      cancelLabel: "Cancelar",
+      confirmColor: colors.success,
+      onConfirm: async () => {
+        setDialog((prev) => (prev ? { ...prev, loading: true } : prev));
+        setAcceptingId(connectionId);
+        try {
+          await apiRequest("PATCH", `/api/connections/${connectionId}/accept`);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+          setDialog(null);
+        } catch (e: any) {
+          showInfoDialog("Não foi possível aceitar", e.message || "Não foi possível aceitar a conexão.", "alert-circle", colors.danger, colors.danger);
+        } finally {
+          setAcceptingId(null);
+        }
+      },
+    });
   };
 
   const connections = connectionsQuery.data || [];
@@ -377,6 +404,29 @@ export default function ConnectionsScreen() {
             </Text>
           ) : null
         }
+      />
+
+      <ConfirmDialog
+        visible={!!dialog}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        icon={dialog?.icon}
+        iconColor={dialog?.iconColor}
+        confirmLabel={dialog?.confirmLabel}
+        cancelLabel={dialog?.cancelLabel}
+        confirmColor={dialog?.confirmColor}
+        singleAction={dialog?.singleAction}
+        loading={dialog?.loading}
+        onConfirm={() => {
+          if (dialog?.onConfirm) {
+            dialog.onConfirm();
+            return;
+          }
+          setDialog(null);
+        }}
+        onCancel={() => {
+          if (!dialog?.loading) setDialog(null);
+        }}
       />
     </View>
   );

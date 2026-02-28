@@ -80,7 +80,7 @@ export default function PrivacyPolicyScreen() {
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>7. Assinaturas e Pagamentos</Text>
         <Text style={[styles.paragraph, { color: colors.textSecondary }]}>
-          Os pagamentos são processados através do Google Play (Android) ou Apple App Store (iOS). Não armazenamos informações de cartão de crédito. As assinaturas são gerenciadas diretamente pelas lojas de aplicativos.
+          Os pagamentos são processados através do Google Play (Android). Não armazenamos informações de cartão de crédito. As assinaturas são gerenciadas diretamente pelas lojas de aplicativos.
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>8. Alterações nesta Política</Text>

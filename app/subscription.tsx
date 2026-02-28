@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Platform,
+  Linking,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,9 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
-import { useAuth } from "@/lib/auth-context";
 import { useSubscription } from "@/lib/subscription-context";
 import { cardShadow } from "@/lib/shadows";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type PlanInterval = "monthly" | "yearly";
 
@@ -40,12 +40,67 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
-  const { user } = useAuth();
-  const { isPremium, isLoading, purchaseMonthly, purchaseYearly, restorePurchases } = useSubscription();
+  const {
+    isPremium,
+    isLoading,
+    subscriptionStatus,
+    subscriptionInterval,
+    subscriptionExpiresAt,
+    subscriptionWillRenew,
+    purchaseMonthly,
+    purchaseYearly,
+    restorePurchases,
+  } = useSubscription();
   const [selectedPlan, setSelectedPlan] = useState<PlanInterval>("yearly");
   const [restoring, setRestoring] = useState(false);
+  const [confirmUpgradeVisible, setConfirmUpgradeVisible] = useState(false);
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+    icon?: keyof typeof Ionicons.glyphMap;
+    iconColor?: string;
+    confirmColor?: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const showInfoDialog = (
+    title: string,
+    message: string,
+    icon: keyof typeof Ionicons.glyphMap = "information-circle",
+    iconColor: string = colors.tint,
+    confirmColor: string = colors.tint,
+    onConfirm?: () => void
+  ) => {
+    setDialog({ title, message, icon, iconColor, confirmColor, onConfirm });
+  };
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "Não informado";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Não informado";
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(date);
+  };
+
+  const handleOpenCancelLink = async () => {
+    const cancelUrl = "https://play.google.com/store/account/subscriptions";
+    try {
+      const canOpen = await Linking.canOpenURL(cancelUrl);
+      if (!canOpen) {
+        showInfoDialog("Atenção", "Não foi possível abrir o link de cancelamento.", "alert-circle", colors.danger, colors.danger);
+        return;
+      }
+      await Linking.openURL(cancelUrl);
+    } catch {
+      showInfoDialog("Atenção", "Não foi possível abrir o link de cancelamento.", "alert-circle", colors.danger, colors.danger);
+    }
+  };
 
   const handleSubscribe = async () => {
+    setConfirmUpgradeVisible(false);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (selectedPlan === "monthly") {
@@ -53,10 +108,19 @@ export default function SubscriptionScreen() {
       } else {
         await purchaseYearly();
       }
-      Alert.alert("Sucesso!", "Seu plano foi atualizado para Premium! Aproveite todos os recursos.");
-      router.back();
+      showInfoDialog(
+        "Sucesso!",
+        "Seu plano foi atualizado para Premium! Aproveite todos os recursos.",
+        "checkmark-circle",
+        colors.success,
+        colors.success,
+        () => {
+          setDialog(null);
+          router.back();
+        }
+      );
     } catch (err: any) {
-      Alert.alert("Erro", err.message || "Não foi possível processar a assinatura.");
+      showInfoDialog("Não foi possível assinar", err.message || "Não foi possível processar a assinatura.", "alert-circle", colors.danger, colors.danger);
     }
   };
 
@@ -65,9 +129,9 @@ export default function SubscriptionScreen() {
     try {
       await restorePurchases();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Restaurado", "Suas compras foram restauradas com sucesso.");
-    } catch (err: any) {
-      Alert.alert("Erro", "Não foi possível restaurar as compras.");
+      showInfoDialog("Restaurado", "Suas compras foram restauradas com sucesso.", "checkmark-circle", colors.success, colors.success);
+    } catch {
+      showInfoDialog("Não foi possível restaurar", "Não foi possível restaurar as compras.", "alert-circle", colors.danger, colors.danger);
     } finally {
       setRestoring(false);
     }
@@ -94,6 +158,32 @@ export default function SubscriptionScreen() {
             <Text style={[styles.premiumActiveSubtitle, { color: colors.textSecondary }]}>
               Você tem acesso a todos os recursos do Toma Aí Premium.
             </Text>
+            <View style={[styles.subscriptionMetaCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <View style={styles.subscriptionMetaRow}>
+                <Text style={[styles.subscriptionMetaLabel, { color: colors.textSecondary }]}>Ciclo</Text>
+                <Text style={[styles.subscriptionMetaValue, { color: colors.text }]}>
+                  {subscriptionInterval === "monthly" ? "Mensal" : subscriptionInterval === "yearly" ? "Anual" : "Não informado"}
+                </Text>
+              </View>
+              <View style={styles.subscriptionMetaRow}>
+                <Text style={[styles.subscriptionMetaLabel, { color: colors.textSecondary }]}>Status</Text>
+                <Text style={[styles.subscriptionMetaValue, { color: colors.text }]}>
+                  {subscriptionStatus}
+                </Text>
+              </View>
+              <View style={styles.subscriptionMetaRow}>
+                <Text style={[styles.subscriptionMetaLabel, { color: colors.textSecondary }]}>Expira em</Text>
+                <Text style={[styles.subscriptionMetaValue, { color: colors.text }]}>
+                  {formatDate(subscriptionExpiresAt)}
+                </Text>
+              </View>
+              <View style={styles.subscriptionMetaRow}>
+                <Text style={[styles.subscriptionMetaLabel, { color: colors.textSecondary }]}>Renovação automática</Text>
+                <Text style={[styles.subscriptionMetaValue, { color: colors.text }]}>
+                  {subscriptionWillRenew ? "Ativa" : "Cancelada no fim do período"}
+                </Text>
+              </View>
+            </View>
             <View style={styles.premiumFeaturesList}>
               {FEATURES_PREMIUM.map((f, i) => (
                 <View key={i} style={styles.featureRow}>
@@ -102,6 +192,19 @@ export default function SubscriptionScreen() {
                 </View>
               ))}
             </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.manageSubscriptionBtn,
+                { backgroundColor: colors.inputBg, borderColor: colors.border },
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={handleOpenCancelLink}
+            >
+              <Ionicons name="open-outline" size={16} color={colors.textSecondary} />
+              <Text style={[styles.manageSubscriptionText, { color: colors.textSecondary }]}>
+                Gerenciar ou cancelar na Google Play
+              </Text>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -229,7 +332,7 @@ export default function SubscriptionScreen() {
             pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
             isLoading && { opacity: 0.6 },
           ]}
-          onPress={handleSubscribe}
+          onPress={() => setConfirmUpgradeVisible(true)}
           disabled={isLoading}
         >
           {isLoading ? (
@@ -259,7 +362,48 @@ export default function SubscriptionScreen() {
         <Text style={[styles.legalText, { color: colors.textSecondary }]}>
           A assinatura é renovada automaticamente. Você pode cancelar a qualquer momento nas configurações da Google Play Store.
         </Text>
+        <Pressable
+          style={({ pressed }) => [styles.restoreBtn, pressed && { opacity: 0.7 }]}
+          onPress={handleOpenCancelLink}
+        >
+          <Text style={[styles.restoreBtnText, { color: colors.textSecondary }]}>
+            Abrir link de cancelamento
+          </Text>
+        </Pressable>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={confirmUpgradeVisible}
+        title="Confirmar assinatura"
+        message={`Você está prestes a assinar o plano ${selectedPlan === "monthly" ? "mensal" : "anual"}. O cancelamento pode ser feito na Google Play e o acesso Premium permanece até o fim do período contratado.`}
+        icon="star"
+        iconColor={colors.warning}
+        confirmLabel="Continuar"
+        cancelLabel="Voltar"
+        confirmColor={colors.tint}
+        loading={isLoading}
+        onConfirm={handleSubscribe}
+        onCancel={() => setConfirmUpgradeVisible(false)}
+      />
+
+      <ConfirmDialog
+        visible={!!dialog}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        icon={dialog?.icon}
+        iconColor={dialog?.iconColor}
+        confirmLabel="OK"
+        confirmColor={dialog?.confirmColor}
+        singleAction
+        onConfirm={() => {
+          if (dialog?.onConfirm) {
+            dialog.onConfirm();
+            return;
+          }
+          setDialog(null);
+        }}
+        onCancel={() => setDialog(null)}
+      />
     </View>
   );
 }
@@ -487,8 +631,45 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
+  subscriptionMetaCard: {
+    width: "100%",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  subscriptionMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  subscriptionMetaLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  subscriptionMetaValue: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
   premiumFeaturesList: {
     alignSelf: "stretch",
     gap: 4,
+  },
+  manageSubscriptionBtn: {
+    marginTop: 14,
+    width: "100%",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  manageSubscriptionText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
 });

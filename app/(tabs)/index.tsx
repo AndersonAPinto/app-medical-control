@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
-  Alert,
 } from "react-native";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -151,6 +150,7 @@ export default function DashboardScreen() {
   const isMaster = user?.role === "MASTER";
   const [activeTab, setActiveTab] = useState<"meds" | "deps">("meds");
   const [confirmMed, setConfirmMed] = useState<Medication | null>(null);
+  const [showDepsLimitDialog, setShowDepsLimitDialog] = useState(false);
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
@@ -204,17 +204,7 @@ export default function DashboardScreen() {
 
   const handleAddDependent = () => {
     if (user?.planType === "FREE" && dependents.length >= 1) {
-      Alert.alert(
-        "Limite do Plano Free",
-        "Você atingiu o limite de 1 dependente do plano gratuito. Assine o Premium para monitorar dependentes ilimitados.",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Ver Planos",
-            onPress: () => router.push("/subscription"),
-          },
-        ]
-      );
+      setShowDepsLimitDialog(true);
       return;
     }
     router.push("/connections");
@@ -429,6 +419,22 @@ export default function DashboardScreen() {
         loading={confirmMutation.isPending}
         onConfirm={() => { if (confirmMed) confirmMutation.mutate(confirmMed); }}
         onCancel={() => { if (!confirmMutation.isPending) setConfirmMed(null); }}
+      />
+
+      <ConfirmDialog
+        visible={showDepsLimitDialog}
+        title="Limite do Plano Free"
+        message="Você atingiu o limite de 1 dependente do plano gratuito. Assine o Premium para monitorar dependentes ilimitados."
+        icon="people"
+        iconColor={colors.warning}
+        confirmLabel="Ver Planos"
+        cancelLabel="Cancelar"
+        confirmColor={colors.warning}
+        onConfirm={() => {
+          setShowDepsLimitDialog(false);
+          router.push("/subscription");
+        }}
+        onCancel={() => setShowDepsLimitDialog(false)}
       />
     </View>
   );

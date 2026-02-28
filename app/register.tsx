@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
@@ -17,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const roles = [
   { key: "MASTER", label: "Responsavel", icon: "shield-checkmark-outline" as const, desc: "Monitora dependentes" },
@@ -32,14 +32,19 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("DEPENDENT");
   const [loading, setLoading] = useState(false);
+  const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
+
+  const showError = (message: string) => {
+    setDialog({ title: "Não foi possível cadastrar", message });
+  };
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Erro", "Preencha todos os campos");
+      showError("Preencha todos os campos");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Erro", "Senha deve ter no minimo 6 caracteres");
+      showError("Senha deve ter no minimo 6 caracteres");
       return;
     }
     setLoading(true);
@@ -47,7 +52,7 @@ export default function RegisterScreen() {
       await register(name.trim(), email.trim(), password, role);
       router.replace("/(tabs)");
     } catch (err: any) {
-      Alert.alert("Erro", err.message || "Falha ao cadastrar");
+      showError(err.message || "Falha ao cadastrar");
     } finally {
       setLoading(false);
     }
@@ -151,6 +156,19 @@ export default function RegisterScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmDialog
+        visible={!!dialog}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        icon="alert-circle"
+        iconColor={Colors.light.danger}
+        confirmLabel="OK"
+        confirmColor={Colors.light.danger}
+        singleAction
+        onConfirm={() => setDialog(null)}
+        onCancel={() => setDialog(null)}
+      />
     </View>
   );
 }

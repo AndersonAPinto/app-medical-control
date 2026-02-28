@@ -6,7 +6,6 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
-  Alert,
   RefreshControl,
   Platform,
 } from "react-native";
@@ -19,6 +18,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import { cardShadow, smallShadow } from "@/lib/shadows";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface Medication {
   id: string;
@@ -40,7 +40,7 @@ interface HistoryEntry {
   medicationDosage: string;
 }
 
-function MedicationDetailCard({ med, onDelete, onEdit, colors }: { med: Medication; onDelete: (id: string) => void; onEdit: (id: string) => void; colors: typeof Colors.light }) {
+function MedicationDetailCard({ med, onDeleteRequest, onEdit, colors }: { med: Medication; onDeleteRequest: (med: Medication) => void; onEdit: (id: string) => void; colors: typeof Colors.light }) {
   const isLowStock = med.currentStock <= med.alertThreshold;
   const isOutOfStock = med.currentStock === 0;
   const stockPercentage = med.alertThreshold > 0
@@ -70,14 +70,7 @@ function MedicationDetailCard({ med, onDelete, onEdit, colors }: { med: Medicati
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Alert.alert(
-              "Remover",
-              `Deseja remover ${med.name}?`,
-              [
-                { text: "Cancelar", style: "cancel" },
-                { text: "Remover", style: "destructive", onPress: () => onDelete(med.id) },
-              ]
-            );
+            onDeleteRequest(med);
           }}
         >
           <Ionicons name="trash-outline" size={20} color={colors.danger} />
@@ -157,6 +150,7 @@ export default function MedicationsScreen() {
   const [activeTab, setActiveTab] = useState<"remedios" | "historico">("remedios");
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+  const [confirmDelete, setConfirmDelete] = useState<Medication | null>(null);
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
@@ -173,6 +167,7 @@ export default function MedicationsScreen() {
       await apiRequest("DELETE", `/api/medications/${id}`);
     },
     onSuccess: () => {
+      setConfirmDelete(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
     },
@@ -240,7 +235,7 @@ export default function MedicationsScreen() {
                 <MedicationDetailCard
                   med={item}
                   colors={colors}
-                  onDelete={(id) => deleteMutation.mutate(id)}
+                  onDeleteRequest={(med) => setConfirmDelete(med)}
                   onEdit={(id) => router.push(`/edit-medication?id=${id}`)}
                 />
               )}
@@ -297,6 +292,24 @@ export default function MedicationsScreen() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        visible={!!confirmDelete}
+        title="Remover"
+        message={confirmDelete ? `Deseja remover ${confirmDelete.name}?` : ""}
+        icon="trash-outline"
+        iconColor={colors.danger}
+        confirmLabel="Remover"
+        cancelLabel="Cancelar"
+        confirmColor={colors.danger}
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (confirmDelete) deleteMutation.mutate(confirmDelete.id);
+        }}
+        onCancel={() => {
+          if (!deleteMutation.isPending) setConfirmDelete(null);
+        }}
+      />
     </View>
   );
 }

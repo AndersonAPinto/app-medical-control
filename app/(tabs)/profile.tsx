@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Alert,
   ScrollView,
   Platform,
   ActivityIndicator,
@@ -20,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { apiRequest } from "@/lib/query-client";
 import { cardShadow } from "@/lib/shadows";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const ROLES = [
   { key: "MASTER", label: "Responsavel", icon: "shield-checkmark" },
@@ -37,27 +37,52 @@ export default function ProfileScreen() {
   const [changingRole, setChangingRole] = useState(false);
   const upgrading = false;
   const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+    icon?: keyof typeof Ionicons.glyphMap;
+    iconColor?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    confirmColor?: string;
+    singleAction?: boolean;
+    loading?: boolean;
+    onConfirm?: () => void;
+  } | null>(null);
 
   const handleLogout = () => {
-    Alert.alert("Sair", "Deseja realmente sair?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Sair",
-        style: "destructive",
-        onPress: async () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          await logout();
-          router.replace("/login");
-        },
+    setDialog({
+      title: "Sair",
+      message: "Deseja realmente sair?",
+      icon: "log-out-outline",
+      iconColor: colors.danger,
+      confirmLabel: "Sair",
+      cancelLabel: "Cancelar",
+      confirmColor: colors.danger,
+      onConfirm: async () => {
+        setDialog((prev) => (prev ? { ...prev, loading: true } : prev));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        await logout();
+        setDialog(null);
+        router.replace("/login");
       },
-    ]);
+    });
   };
 
   const handleCopyId = async () => {
     if (!user?.id) return;
     await Clipboard.setStringAsync(user.id);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert("Copiado", "Seu ID foi copiado para a area de transferencia.");
+    setDialog({
+      title: "Copiado",
+      message: "Seu ID foi copiado para a area de transferencia.",
+      icon: "checkmark-circle",
+      iconColor: colors.success,
+      confirmLabel: "OK",
+      confirmColor: colors.tint,
+      singleAction: true,
+      onConfirm: () => setDialog(null),
+    });
   };
 
   const handleOpenEdit = () => {
@@ -75,29 +100,48 @@ export default function ProfileScreen() {
       setRolePickerVisible(false);
       return;
     }
-    Alert.alert(
-      "Alterar Função",
-      "Mudar sua função afeta suas permissões no app. Deseja continuar?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Confirmar",
-          onPress: async () => {
-            setChangingRole(true);
-            try {
-              await apiRequest("PATCH", "/api/auth/role", { role: roleKey });
-              await refreshUser();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setRolePickerVisible(false);
-            } catch (e: any) {
-              Alert.alert("Erro", e.message || "Não foi possível alterar a função.");
-            } finally {
-              setChangingRole(false);
-            }
-          },
-        },
-      ]
-    );
+    setDialog({
+      title: "Alterar Funcao",
+      message: "Mudar sua função afeta suas permissões no app. Deseja continuar?",
+      icon: "swap-horizontal",
+      iconColor: colors.warning,
+      confirmLabel: "Confirmar",
+      cancelLabel: "Cancelar",
+      confirmColor: colors.warning,
+      onConfirm: async () => {
+        setDialog((prev) => (prev ? { ...prev, loading: true } : prev));
+        setChangingRole(true);
+        try {
+          await apiRequest("PATCH", "/api/auth/role", { role: roleKey });
+          await refreshUser();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setRolePickerVisible(false);
+          setDialog({
+            title: "Sucesso",
+            message: "Função alterada com sucesso.",
+            icon: "checkmark-circle",
+            iconColor: colors.success,
+            confirmLabel: "OK",
+            confirmColor: colors.tint,
+            singleAction: true,
+            onConfirm: () => setDialog(null),
+          });
+        } catch (e: any) {
+          setDialog({
+            title: "Não foi possível alterar função",
+            message: e.message || "Não foi possível alterar a função.",
+            icon: "alert-circle",
+            iconColor: colors.danger,
+            confirmLabel: "OK",
+            confirmColor: colors.danger,
+            singleAction: true,
+            onConfirm: () => setDialog(null),
+          });
+        } finally {
+          setChangingRole(false);
+        }
+      },
+    });
   };
 
   const handlePlanPress = () => {
@@ -250,7 +294,7 @@ export default function ProfileScreen() {
         onRequestClose={() => setRolePickerVisible(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setRolePickerVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={() => {}}>
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={() => { }}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Selecionar Função</Text>
             <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Escolha sua função no app</Text>
             {ROLES.map((role) => {
@@ -291,7 +335,7 @@ export default function ProfileScreen() {
         onRequestClose={() => setThemePickerVisible(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setThemePickerVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={() => {}}>
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={() => { }}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Escolher Tema</Text>
             <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Selecione a aparencia do app</Text>
 
@@ -328,6 +372,29 @@ export default function ProfileScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!dialog}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        icon={dialog?.icon}
+        iconColor={dialog?.iconColor}
+        confirmLabel={dialog?.confirmLabel}
+        cancelLabel={dialog?.cancelLabel}
+        confirmColor={dialog?.confirmColor}
+        singleAction={dialog?.singleAction}
+        loading={dialog?.loading}
+        onConfirm={() => {
+          if (dialog?.onConfirm) {
+            dialog.onConfirm();
+            return;
+          }
+          setDialog(null);
+        }}
+        onCancel={() => {
+          if (!dialog?.loading) setDialog(null);
+        }}
+      />
     </View>
   );
 }

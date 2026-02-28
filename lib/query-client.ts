@@ -24,11 +24,54 @@ export function getApiUrl(): string {
   );
 }
 
-async function throwIfResNotOk(res: Response) {
-  if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+function toFriendlyErrorMessage(raw: string, status: number): string {
+  const msg = raw.trim().toLowerCase();
+
+  if (msg.includes("invalid email or password")) {
+    return "Email ou senha inválidos.";
   }
+  if (msg.includes("invalid credentials")) {
+    return "Dados de acesso inválidos.";
+  }
+  if (msg.includes("failed to fetch") || msg.includes("network")) {
+    return "Não foi possível conectar. Verifique sua internet.";
+  }
+  if (status === 401) {
+    return "Email ou senha inválidos.";
+  }
+  if (status >= 500) {
+    return "Servidor indisponível no momento. Tente novamente.";
+  }
+
+  return raw || "Ocorreu um erro inesperado. Tente novamente.";
+}
+
+async function throwIfResNotOk(res: Response) {
+  if (res.ok) return;
+
+  let rawMessage = "";
+
+  try {
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json().catch(() => null)) as { message?: string } | null;
+      rawMessage = body?.message ?? "";
+    } else {
+      const text = (await res.text()).trim();
+      if (text) {
+        try {
+          const parsed = JSON.parse(text) as { message?: string };
+          rawMessage = parsed?.message ?? text;
+        } catch {
+          rawMessage = text;
+        }
+      }
+    }
+  } catch {
+    rawMessage = "";
+  }
+
+  throw new Error(toFriendlyErrorMessage(rawMessage, res.status));
 }
 
 export async function apiRequest(

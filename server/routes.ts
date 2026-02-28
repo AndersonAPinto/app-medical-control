@@ -27,6 +27,59 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
+const REVENUECAT_ENTITLEMENT_ID = process.env.REVENUECAT_ENTITLEMENT_ID || "premium";
+
+function toDateOrNull(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function inferInterval(
+  productId?: string | null,
+  preferred?: string | null,
+): "monthly" | "yearly" | null {
+  if (preferred === "monthly" || preferred === "yearly") return preferred;
+  if (!productId) return null;
+  const normalized = productId.toLowerCase();
+  if (
+    normalized.includes("year") ||
+    normalized.includes("annual") ||
+    normalized.includes("ano") ||
+    normalized.includes("anual")
+  ) {
+    return "yearly";
+  }
+  if (
+    normalized.includes("month") ||
+    normalized.includes("mensal") ||
+    normalized.includes("mes")
+  ) {
+    return "monthly";
+  }
+  return null;
+}
+
+function hasFutureExpiry(expiresAt: Date | null | undefined): boolean {
+  return Boolean(expiresAt && expiresAt.getTime() > Date.now());
+}
+
+function resolvePlanTypeFromSubscription(
+  isActiveNow: boolean,
+  expiresAt: Date | null | undefined,
+): "FREE" | "PREMIUM" {
+  if (isActiveNow || hasFutureExpiry(expiresAt)) return "PREMIUM";
+  return "FREE";
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   const isProduction = process.env.NODE_ENV === "production";
   if (isProduction && !process.env.SESSION_SECRET) {
@@ -171,7 +224,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/upgrade", requireAuth, async (req: Request, res: Response) => {
     try {
-      const updated = await storage.updateUser(req.session.userId!, { planType: "PREMIUM" });
+      const now = new Date();
+      const updated = await storage.updateUser(req.session.userId!, {
+        planType: "PREMIUM",
+        subscriptionStatus: "ACTIVE",
+        subscriptionWillRenew: true,
+        subscriptionStartedAt: now,
+      });
       const { password: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
@@ -182,16 +241,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/sync-plan", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { planType } = req.body;
-      if (!planType || !["FREE", "PREMIUM"].includes(planType)) {
-        return res.status(400).json({ message: "Invalid plan type" });
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
-      const updated = await storage.updateUser(req.session.userId!, { planType });
+
+      const { planType, source, selectedInterval, customerInfo } = req.body ?? {};
+
+      // Backward-compatible branch used by legacy clients.
+      if (planType && typeof planType === "string" && ["FREE", "PREMIUM"].includes(planType)) {
+        const updated = await storage.updateUser(req.session.userId!, {
+          planType: planType as "FREE" | "PREMIUM",
+          subscriptionStatus: planType === "PREMIUM" ? "ACTIVE" : "INACTIVE",
+          subscriptionWillRenew: planType === "PREMIUM",
+          subscriptionLastEventAt: new Date(),
+        });
+        const { password: _, ...safeUser } = updated;
+        return res.json(safeUser);
+      }
+
+      if (source !== "revenuecat") {
+        return res.status(400).json({ message: "Invalid sync source" });
+      }
+
+      const activeEntitlements = customerInfo?.entitlements?.active ?? {};
+      const entitlementEntry =
+        activeEntitlements?.[REVENUECAT_ENTITLEMENT_ID] ||
+        Object.values(activeEntitlements)[0] ||
+        null;
+
+      if (!entitlementEntry) {
+        const updated = await storage.updateUser(req.session.userId!, {
+          planType: "FREE",
+          subscriptionStatus: "EXPIRED",
+          subscriptionWillRenew: false,
+          subscriptionLastEventAt: new Date(),
+        });
+        const { password: _, ...safeUser } = updated;
+        return res.json(safeUser);
+      }
+
+      const entitlement = entitlementEntry as Record<string, unknown>;
+      const expiresAt = toDateOrNull(entitlement.expirationDate);
+      const startedAt =
+        toDateOrNull(entitlement.latestPurchaseDate) ||
+        toDateOrNull(entitlement.originalPurchaseDate) ||
+        new Date();
+      const willRenew =
+        typeof entitlement.willRenew === "boolean" ? entitlement.willRenew : true;
+      const productId =
+        (entitlement.productIdentifier as string | undefined) || null;
+      const interval = inferInterval(productId, selectedInterval);
+      const nextPlanType = resolvePlanTypeFromSubscription(true, expiresAt);
+
+      const updated = await storage.updateUser(req.session.userId!, {
+        planType: nextPlanType,
+        subscriptionStatus: willRenew ? "ACTIVE" : "CANCELED",
+        subscriptionInterval: interval,
+        subscriptionProductId: productId,
+        subscriptionEntitlementId: REVENUECAT_ENTITLEMENT_ID,
+        revenueCatCustomerId:
+          (customerInfo?.originalAppUserId as string | undefined) ||
+          (customerInfo?.appUserID as string | undefined) ||
+          user.revenueCatCustomerId,
+        subscriptionStore:
+          (entitlement.store as string | undefined) || user.subscriptionStore,
+        subscriptionWillRenew: willRenew,
+        subscriptionStartedAt: startedAt,
+        subscriptionExpiresAt: expiresAt,
+        subscriptionCanceledAt: willRenew ? null : user.subscriptionCanceledAt,
+        subscriptionLastEventAt: new Date(),
+      });
       const { password: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
       console.error("Sync plan error:", error);
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/revenuecat/webhook", async (req: Request, res: Response) => {
+    try {
+      const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+      const authHeader = req.header("authorization") || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim();
+
+      if (webhookSecret && token !== webhookSecret) {
+        return res.status(401).json({ message: "Invalid webhook token" });
+      }
+
+      const event = req.body?.event;
+      if (!event) {
+        return res.status(400).json({ message: "Missing event payload" });
+      }
+
+      const appUserId = event.app_user_id || event.original_app_user_id;
+      if (!appUserId || typeof appUserId !== "string") {
+        return res.status(200).json({ received: true, ignored: "missing app_user_id" });
+      }
+
+      const user = await storage.getUserById(appUserId);
+      if (!user) {
+        return res.status(200).json({ received: true, ignored: "user not found" });
+      }
+
+      const eventType = String(event.type || "UNKNOWN").toUpperCase();
+      const productId = typeof event.product_id === "string" ? event.product_id : user.subscriptionProductId;
+      const interval = inferInterval(productId, user.subscriptionInterval as string | null);
+      const entitlementIds = Array.isArray(event.entitlement_ids) ? event.entitlement_ids : [];
+      const entitlementId =
+        (entitlementIds[0] as string | undefined) ||
+        user.subscriptionEntitlementId ||
+        REVENUECAT_ENTITLEMENT_ID;
+      const startedAt =
+        toDateOrNull(event.purchased_at_ms) ||
+        toDateOrNull(event.purchased_at) ||
+        user.subscriptionStartedAt;
+      const expiresAt =
+        toDateOrNull(event.expiration_at_ms) ||
+        toDateOrNull(event.expiration_at) ||
+        user.subscriptionExpiresAt;
+      const eventAt =
+        toDateOrNull(event.event_timestamp_ms) ||
+        toDateOrNull(event.event_timestamp) ||
+        new Date();
+
+      let subscriptionStatus = user.subscriptionStatus || "INACTIVE";
+      let willRenew = user.subscriptionWillRenew;
+      let canceledAt = user.subscriptionCanceledAt;
+      let planType = user.planType as "FREE" | "PREMIUM";
+
+      if (["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE"].includes(eventType)) {
+        subscriptionStatus = "ACTIVE";
+        willRenew = true;
+        canceledAt = null;
+        planType = "PREMIUM";
+      } else if (eventType === "CANCELLATION") {
+        subscriptionStatus = "CANCELED";
+        willRenew = false;
+        canceledAt = eventAt;
+        planType = resolvePlanTypeFromSubscription(false, expiresAt);
+      } else if (eventType === "BILLING_ISSUE") {
+        subscriptionStatus = "BILLING_ISSUE";
+        willRenew = false;
+        planType = resolvePlanTypeFromSubscription(false, expiresAt);
+      } else if (eventType === "EXPIRATION") {
+        subscriptionStatus = "EXPIRED";
+        willRenew = false;
+        planType = "FREE";
+      } else {
+        planType = resolvePlanTypeFromSubscription(planType === "PREMIUM", expiresAt);
+        if (planType === "FREE" && subscriptionStatus === "ACTIVE" && !hasFutureExpiry(expiresAt)) {
+          subscriptionStatus = "EXPIRED";
+        }
+      }
+
+      if (!hasFutureExpiry(expiresAt) && subscriptionStatus === "CANCELED") {
+        subscriptionStatus = "EXPIRED";
+      }
+
+      const updated = await storage.updateUser(user.id, {
+        planType,
+        subscriptionStatus,
+        subscriptionInterval: interval,
+        subscriptionProductId: productId,
+        subscriptionEntitlementId: entitlementId,
+        revenueCatCustomerId:
+          (event.original_app_user_id as string | undefined) ||
+          (event.app_user_id as string | undefined) ||
+          user.revenueCatCustomerId,
+        subscriptionStore:
+          (event.store as string | undefined) || user.subscriptionStore,
+        subscriptionWillRenew: willRenew,
+        subscriptionStartedAt: startedAt,
+        subscriptionExpiresAt: expiresAt,
+        subscriptionCanceledAt: canceledAt,
+        subscriptionLastEventAt: eventAt,
+      });
+
+      return res.status(200).json({
+        received: true,
+        eventType,
+        userId: updated.id,
+        planType: updated.planType,
+      });
+    } catch (error) {
+      console.error("RevenueCat webhook error:", error);
+      return res.status(500).json({ message: "Server error" });
     }
   });
 

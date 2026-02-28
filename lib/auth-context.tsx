@@ -8,6 +8,17 @@ interface UserProfile {
   email: string;
   role: string;
   planType: string;
+  subscriptionStatus?: string;
+  subscriptionInterval?: "monthly" | "yearly" | null;
+  subscriptionProductId?: string | null;
+  subscriptionEntitlementId?: string | null;
+  revenueCatCustomerId?: string | null;
+  subscriptionStore?: string | null;
+  subscriptionWillRenew?: boolean;
+  subscriptionStartedAt?: string | null;
+  subscriptionExpiresAt?: string | null;
+  subscriptionCanceledAt?: string | null;
+  subscriptionLastEventAt?: string | null;
   linkedMasterId: string | null;
 }
 

@@ -22,6 +22,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   confirmColor?: string;
+  singleAction?: boolean;
+  dismissOnBackdrop?: boolean;
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -36,6 +38,8 @@ export default function ConfirmDialog({
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
   confirmColor,
+  singleAction = false,
+  dismissOnBackdrop = true,
   loading = false,
   onConfirm,
   onCancel,
@@ -54,11 +58,18 @@ export default function ConfirmDialog({
       onRequestClose={onCancel}
     >
       <View style={styles.overlay}>
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
+        <Pressable
           style={styles.backdropFill}
-        />
+          onPress={() => {
+            if (!loading && dismissOnBackdrop) onCancel();
+          }}
+        >
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            style={styles.backdropFill}
+          />
+        </Pressable>
         <Animated.View
           entering={ZoomIn.duration(250).springify().damping(18).stiffness(200)}
           style={[
@@ -82,25 +93,28 @@ export default function ConfirmDialog({
           </Text>
 
           <View style={styles.actions}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.btn,
-                styles.cancelBtn,
-                { backgroundColor: colors.inputBg, borderColor: colors.border },
-                pressed && { opacity: 0.7 },
-              ]}
-              onPress={onCancel}
-              disabled={loading}
-            >
-              <Text style={[styles.btnText, { color: colors.textSecondary }]}>
-                {cancelLabel}
-              </Text>
-            </Pressable>
+            {!singleAction && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.cancelBtn,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={onCancel}
+                disabled={loading}
+              >
+                <Text style={[styles.btnText, { color: colors.textSecondary }]}>
+                  {cancelLabel}
+                </Text>
+              </Pressable>
+            )}
 
             <Pressable
               style={({ pressed }) => [
                 styles.btn,
                 styles.confirmBtn,
+                singleAction && styles.singleBtn,
                 { backgroundColor: accentColor },
                 pressed && { opacity: 0.8 },
                 loading && { opacity: 0.6 },
@@ -179,6 +193,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   confirmBtn: {},
+  singleBtn: {
+    flex: undefined,
+    width: "100%",
+  },
   btnText: {
     fontSize: 15,
     fontWeight: "600" as const,
