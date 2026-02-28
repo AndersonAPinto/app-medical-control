@@ -2,8 +2,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import Purchases, { LOG_LEVEL } from "react-native-purchases";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/lib/auth-context";
@@ -11,6 +13,8 @@ import { SubscriptionProvider } from "@/lib/subscription-context";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import Colors from "@/constants/colors";
+
+const REVENUECAT_ANDROID_API_KEY = "goog_ieyHTSlFYWXokTJsvLmpHdolMew";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -74,6 +78,16 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+
+  useEffect(() => {
+    Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+
+    if (Platform.OS !== "android") {
+      return;
+    }
+
+    Purchases.configure({ apiKey: REVENUECAT_ANDROID_API_KEY });
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {
