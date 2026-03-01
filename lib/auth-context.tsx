@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
+import { registerForPushNotificationsAsync } from "@/lib/push-notifications";
 
 interface UserProfile {
   id: string;
@@ -56,6 +57,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshUser().finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let cancelled = false;
+
+    const registerPushToken = async () => {
+      const token = await registerForPushNotificationsAsync();
+      if (!token || cancelled) return;
+
+      try {
+        await apiRequest("POST", "/api/push-tokens", { token });
+      } catch (error) {
+        console.error("Failed to register push token:", error);
+      }
+    };
+
+    registerPushToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const login = async (email: string, password: string) => {
     const res = await apiRequest("POST", "/api/auth/login", { email, password });

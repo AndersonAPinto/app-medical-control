@@ -56,6 +56,7 @@ export interface IStorage {
     >
   ): Promise<User>;
   getMedicationsByOwner(ownerId: string): Promise<Medication[]>;
+  getAllMedications(): Promise<Medication[]>;
   getMedicationById(id: string): Promise<Medication | undefined>;
   createMedication(med: InsertMedication & { ownerId: string }): Promise<Medication>;
   updateMedication(id: string, ownerId: string, data: Partial<Pick<Medication, "name" | "dosage" | "currentStock" | "alertThreshold" | "intervalInHours">>): Promise<Medication>;
@@ -80,6 +81,7 @@ export interface IStorage {
   markAllNotificationsRead(userId: string): Promise<void>;
   registerPushToken(userId: string, token: string): Promise<PushToken>;
   getPushTokensByUser(userId: string): Promise<PushToken[]>;
+  deletePushToken(token: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -127,6 +129,10 @@ export class DatabaseStorage implements IStorage {
 
   async getMedicationsByOwner(ownerId: string): Promise<Medication[]> {
     return db.select().from(medications).where(eq(medications.ownerId, ownerId));
+  }
+
+  async getAllMedications(): Promise<Medication[]> {
+    return db.select().from(medications);
   }
 
   async getMedicationById(id: string): Promise<Medication | undefined> {
@@ -238,6 +244,10 @@ export class DatabaseStorage implements IStorage {
 
   async getPushTokensByUser(userId: string): Promise<PushToken[]> {
     return db.select().from(pushTokens).where(eq(pushTokens.userId, userId));
+  }
+
+  async deletePushToken(token: string): Promise<void> {
+    await db.delete(pushTokens).where(eq(pushTokens.token, token));
   }
 
   async getDependentsForMaster(masterId: string): Promise<User[]> {

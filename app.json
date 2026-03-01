@@ -2,7 +2,7 @@
   "expo": {
     "name": "Toma Aí",
     "slug": "medcontrol",
-    "version": "1.0.2",
+    "version": "1.2.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "medcontrol",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.medcontrol.app",
-      "versionCode": 2,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#0D9488",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -28,7 +28,8 @@
       },
       "permissions": [
         "INTERNET",
-        "VIBRATE"
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -37,7 +38,8 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

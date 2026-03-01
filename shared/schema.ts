@@ -126,7 +126,7 @@ export const insertConnectionSchema = z.object({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
-export type Medication = typeof medications.$inferSelect;
+export type Medication = typeof medications.$inferSelect & { lastDoseAt?: number | null };
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
 export type DoseSchedule = typeof doseSchedules.$inferSelect;
 export type Connection = typeof connections.$inferSelect;

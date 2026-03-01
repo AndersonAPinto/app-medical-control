@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ interface Medication {
   alertThreshold: number;
   intervalInHours: number;
   ownerId: string;
+  lastDoseAt?: number | null;
 }
 
 interface Schedule {
@@ -53,6 +54,19 @@ interface DependentSummary {
 function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onConfirmDose: (med: Medication) => void; colors: typeof Colors.light }) {
   const isLowStock = med.currentStock <= med.alertThreshold;
   const isOutOfStock = med.currentStock === 0;
+
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!med.lastDoseAt) return;
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [med.lastDoseAt]);
+
+  const nextDoseTime = med.lastDoseAt ? med.lastDoseAt + med.intervalInHours * 3600000 : null;
+  const canTakeDose = nextDoseTime ? now >= nextDoseTime - 300000 : true;
 
   return (
     <Pressable
@@ -83,14 +97,25 @@ function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onCon
               {med.currentStock} un.
             </Text>
           </View>
+          {!canTakeDose && nextDoseTime && (
+            <Text style={[styles.medMetaText, { color: colors.warning, marginTop: 4, fontSize: 11 }]}>
+              Próxima dose: {new Date(nextDoseTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          )}
         </View>
       </View>
 
       <Pressable
-        style={({ pressed }) => [styles.confirmBtn, { backgroundColor: colors.success }, pressed && styles.confirmBtnPressed]}
-        onPress={() => onConfirmDose(med)}
+        style={({ pressed }) => [
+          styles.confirmBtn, 
+          { backgroundColor: canTakeDose ? colors.success : colors.border }, 
+          pressed && canTakeDose && styles.confirmBtnPressed,
+          !canTakeDose && { opacity: 0.6 }
+        ]}
+        onPress={() => canTakeDose && onConfirmDose(med)}
+        disabled={!canTakeDose}
       >
-        <Ionicons name="checkmark" size={22} color="#fff" />
+        <Ionicons name={canTakeDose ? "checkmark" : "time"} size={22} color="#fff" />
       </Pressable>
     </Pressable>
   );

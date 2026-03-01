@@ -16,6 +16,17 @@ var users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("MASTER"),
   planType: text("plan_type").notNull().default("FREE"),
+  subscriptionStatus: text("subscription_status").notNull().default("INACTIVE"),
+  subscriptionInterval: text("subscription_interval"),
+  subscriptionProductId: text("subscription_product_id"),
+  subscriptionEntitlementId: text("subscription_entitlement_id"),
+  revenueCatCustomerId: text("revenuecat_customer_id"),
+  subscriptionStore: text("subscription_store"),
+  subscriptionWillRenew: boolean("subscription_will_renew").notNull().default(false),
+  subscriptionStartedAt: timestamp("subscription_started_at"),
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  subscriptionCanceledAt: timestamp("subscription_canceled_at"),
+  subscriptionLastEventAt: timestamp("subscription_last_event_at"),
   linkedMasterId: text("linked_master_id"),
   createdAt: timestamp("created_at").defaultNow()
 });
@@ -126,6 +137,9 @@ var DatabaseStorage = class {
   async getMedicationsByOwner(ownerId) {
     return db.select().from(medications).where(eq(medications.ownerId, ownerId));
   }
+  async getAllMedications() {
+    return db.select().from(medications);
+  }
   async getMedicationById(id) {
     const [med] = await db.select().from(medications).where(eq(medications.id, id));
     return med;
@@ -211,6 +225,9 @@ var DatabaseStorage = class {
   async getPushTokensByUser(userId) {
     return db.select().from(pushTokens).where(eq(pushTokens.userId, userId));
   }
+  async deletePushToken(token) {
+    await db.delete(pushTokens).where(eq(pushTokens.token, token));
+  }
   async getDependentsForMaster(masterId) {
     const conns = await this.getConnectionsByMaster(masterId);
     const acceptedConns = conns.filter((c) => c.status === "ACCEPTED");
@@ -232,11 +249,122 @@ var storage = new DatabaseStorage();
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+
+// server/services/push.ts
+function isExpoToken(token) {
+  return token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken[");
+}
+async function sendPushToUsers(userIds, payload) {
+  if (userIds.length === 0) return;
+  const uniqueUserIds = Array.from(new Set(userIds));
+  const tokenLists = await Promise.all(uniqueUserIds.map((userId) => storage.getPushTokensByUser(userId)));
+  const tokens = tokenLists.flat().map((entry) => entry.token).filter(isExpoToken);
+  if (tokens.length === 0) return;
+  const messages = tokens.map((token) => ({
+    to: token,
+    sound: "default",
+    title: payload.title,
+    body: payload.body,
+    data: payload.data
+  }));
+  try {
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(messages)
+    });
+    if (!response.ok) {
+      const raw = await response.text();
+      console.error("Expo push send failed:", response.status, raw);
+      return;
+    }
+    const result = await response.json();
+    const items = result.data || [];
+    await Promise.all(
+      items.map(async (item, index) => {
+        if (item.status !== "error") return;
+        const errorCode = item.details?.error;
+        const token = messages[index]?.to;
+        if (!token) return;
+        if (errorCode === "DeviceNotRegistered") {
+          await storage.deletePushToken(token);
+          return;
+        }
+        console.error("Expo push item error:", item.message || errorCode || "Unknown error", { token });
+      })
+    );
+  } catch (error) {
+    console.error("Expo push send exception:", error);
+  }
+}
+
+// server/routes.ts
 function requireAuth(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Not authenticated" });
   }
   next();
+}
+var REVENUECAT_ENTITLEMENT_ID = process.env.REVENUECAT_ENTITLEMENT_ID || "premium";
+function toDateOrNull(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+function inferInterval(productId, preferred) {
+  if (preferred === "monthly" || preferred === "yearly") return preferred;
+  if (!productId) return null;
+  const normalized = productId.toLowerCase();
+  if (normalized.includes("year") || normalized.includes("annual") || normalized.includes("ano") || normalized.includes("anual")) {
+    return "yearly";
+  }
+  if (normalized.includes("month") || normalized.includes("mensal") || normalized.includes("mes")) {
+    return "monthly";
+  }
+  return null;
+}
+function hasFutureExpiry(expiresAt) {
+  return Boolean(expiresAt && expiresAt.getTime() > Date.now());
+}
+async function getMasterAndControllerRecipients(dependentId) {
+  const dependentConns = await storage.getConnectionsByDependent(dependentId);
+  const acceptedMasterIds = dependentConns.filter((conn) => conn.status === "ACCEPTED").map((conn) => conn.masterId);
+  const recipients = new Set(acceptedMasterIds);
+  for (const masterId of acceptedMasterIds) {
+    const masterConns = await storage.getConnectionsByMaster(masterId);
+    const acceptedConns = masterConns.filter((conn) => conn.status === "ACCEPTED");
+    for (const conn of acceptedConns) {
+      const maybeController = await storage.getUserById(conn.dependentId);
+      if (maybeController?.role === "CONTROLLER") {
+        recipients.add(maybeController.id);
+      }
+    }
+  }
+  return Array.from(recipients);
+}
+async function createInAppAndPushNotification(params) {
+  const { userId, type, title, message, relatedId } = params;
+  await storage.createNotification({ userId, type, title, message, relatedId });
+  await sendPushToUsers([userId], {
+    title,
+    body: message,
+    data: { type, relatedId }
+  });
+}
+function resolvePlanTypeFromSubscription(isActiveNow, expiresAt) {
+  if (isActiveNow || hasFutureExpiry(expiresAt)) return "PREMIUM";
+  return "FREE";
 }
 async function registerRoutes(app2) {
   const isProduction = process.env.NODE_ENV === "production";
@@ -363,7 +491,13 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/auth/upgrade", requireAuth, async (req, res) => {
     try {
-      const updated = await storage.updateUser(req.session.userId, { planType: "PREMIUM" });
+      const now = /* @__PURE__ */ new Date();
+      const updated = await storage.updateUser(req.session.userId, {
+        planType: "PREMIUM",
+        subscriptionStatus: "ACTIVE",
+        subscriptionWillRenew: true,
+        subscriptionStartedAt: now
+      });
       const { password: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
@@ -373,16 +507,146 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/auth/sync-plan", requireAuth, async (req, res) => {
     try {
-      const { planType } = req.body;
-      if (!planType || !["FREE", "PREMIUM"].includes(planType)) {
-        return res.status(400).json({ message: "Invalid plan type" });
+      const user = await storage.getUserById(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
-      const updated = await storage.updateUser(req.session.userId, { planType });
+      const { planType, source, selectedInterval, customerInfo } = req.body ?? {};
+      if (planType && typeof planType === "string" && ["FREE", "PREMIUM"].includes(planType)) {
+        const updated2 = await storage.updateUser(req.session.userId, {
+          planType,
+          subscriptionStatus: planType === "PREMIUM" ? "ACTIVE" : "INACTIVE",
+          subscriptionWillRenew: planType === "PREMIUM",
+          subscriptionLastEventAt: /* @__PURE__ */ new Date()
+        });
+        const { password: _2, ...safeUser2 } = updated2;
+        return res.json(safeUser2);
+      }
+      if (source !== "revenuecat") {
+        return res.status(400).json({ message: "Invalid sync source" });
+      }
+      const activeEntitlements = customerInfo?.entitlements?.active ?? {};
+      const entitlementEntry = activeEntitlements?.[REVENUECAT_ENTITLEMENT_ID] || Object.values(activeEntitlements)[0] || null;
+      if (!entitlementEntry) {
+        const updated2 = await storage.updateUser(req.session.userId, {
+          planType: "FREE",
+          subscriptionStatus: "EXPIRED",
+          subscriptionWillRenew: false,
+          subscriptionLastEventAt: /* @__PURE__ */ new Date()
+        });
+        const { password: _2, ...safeUser2 } = updated2;
+        return res.json(safeUser2);
+      }
+      const entitlement = entitlementEntry;
+      const expiresAt = toDateOrNull(entitlement.expirationDate);
+      const startedAt = toDateOrNull(entitlement.latestPurchaseDate) || toDateOrNull(entitlement.originalPurchaseDate) || /* @__PURE__ */ new Date();
+      const willRenew = typeof entitlement.willRenew === "boolean" ? entitlement.willRenew : true;
+      const productId = entitlement.productIdentifier || null;
+      const interval = inferInterval(productId, selectedInterval);
+      const nextPlanType = resolvePlanTypeFromSubscription(true, expiresAt);
+      const updated = await storage.updateUser(req.session.userId, {
+        planType: nextPlanType,
+        subscriptionStatus: willRenew ? "ACTIVE" : "CANCELED",
+        subscriptionInterval: interval,
+        subscriptionProductId: productId,
+        subscriptionEntitlementId: REVENUECAT_ENTITLEMENT_ID,
+        revenueCatCustomerId: customerInfo?.originalAppUserId || customerInfo?.appUserID || user.revenueCatCustomerId,
+        subscriptionStore: entitlement.store || user.subscriptionStore,
+        subscriptionWillRenew: willRenew,
+        subscriptionStartedAt: startedAt,
+        subscriptionExpiresAt: expiresAt,
+        subscriptionCanceledAt: willRenew ? null : user.subscriptionCanceledAt,
+        subscriptionLastEventAt: /* @__PURE__ */ new Date()
+      });
       const { password: _, ...safeUser } = updated;
       res.json(safeUser);
     } catch (error) {
       console.error("Sync plan error:", error);
       res.status(500).json({ message: "Server error" });
+    }
+  });
+  app2.post("/api/revenuecat/webhook", async (req, res) => {
+    try {
+      const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+      const authHeader = req.header("authorization") || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim();
+      if (webhookSecret && token !== webhookSecret) {
+        return res.status(401).json({ message: "Invalid webhook token" });
+      }
+      const event = req.body?.event;
+      if (!event) {
+        return res.status(400).json({ message: "Missing event payload" });
+      }
+      const appUserId = event.app_user_id || event.original_app_user_id;
+      if (!appUserId || typeof appUserId !== "string") {
+        return res.status(200).json({ received: true, ignored: "missing app_user_id" });
+      }
+      const user = await storage.getUserById(appUserId);
+      if (!user) {
+        return res.status(200).json({ received: true, ignored: "user not found" });
+      }
+      const eventType = String(event.type || "UNKNOWN").toUpperCase();
+      const productId = typeof event.product_id === "string" ? event.product_id : user.subscriptionProductId;
+      const interval = inferInterval(productId, user.subscriptionInterval);
+      const entitlementIds = Array.isArray(event.entitlement_ids) ? event.entitlement_ids : [];
+      const entitlementId = entitlementIds[0] || user.subscriptionEntitlementId || REVENUECAT_ENTITLEMENT_ID;
+      const startedAt = toDateOrNull(event.purchased_at_ms) || toDateOrNull(event.purchased_at) || user.subscriptionStartedAt;
+      const expiresAt = toDateOrNull(event.expiration_at_ms) || toDateOrNull(event.expiration_at) || user.subscriptionExpiresAt;
+      const eventAt = toDateOrNull(event.event_timestamp_ms) || toDateOrNull(event.event_timestamp) || /* @__PURE__ */ new Date();
+      let subscriptionStatus = user.subscriptionStatus || "INACTIVE";
+      let willRenew = user.subscriptionWillRenew;
+      let canceledAt = user.subscriptionCanceledAt;
+      let planType = user.planType;
+      if (["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE"].includes(eventType)) {
+        subscriptionStatus = "ACTIVE";
+        willRenew = true;
+        canceledAt = null;
+        planType = "PREMIUM";
+      } else if (eventType === "CANCELLATION") {
+        subscriptionStatus = "CANCELED";
+        willRenew = false;
+        canceledAt = eventAt;
+        planType = resolvePlanTypeFromSubscription(false, expiresAt);
+      } else if (eventType === "BILLING_ISSUE") {
+        subscriptionStatus = "BILLING_ISSUE";
+        willRenew = false;
+        planType = resolvePlanTypeFromSubscription(false, expiresAt);
+      } else if (eventType === "EXPIRATION") {
+        subscriptionStatus = "EXPIRED";
+        willRenew = false;
+        planType = "FREE";
+      } else {
+        planType = resolvePlanTypeFromSubscription(planType === "PREMIUM", expiresAt);
+        if (planType === "FREE" && subscriptionStatus === "ACTIVE" && !hasFutureExpiry(expiresAt)) {
+          subscriptionStatus = "EXPIRED";
+        }
+      }
+      if (!hasFutureExpiry(expiresAt) && subscriptionStatus === "CANCELED") {
+        subscriptionStatus = "EXPIRED";
+      }
+      const updated = await storage.updateUser(user.id, {
+        planType,
+        subscriptionStatus,
+        subscriptionInterval: interval,
+        subscriptionProductId: productId,
+        subscriptionEntitlementId: entitlementId,
+        revenueCatCustomerId: event.original_app_user_id || event.app_user_id || user.revenueCatCustomerId,
+        subscriptionStore: event.store || user.subscriptionStore,
+        subscriptionWillRenew: willRenew,
+        subscriptionStartedAt: startedAt,
+        subscriptionExpiresAt: expiresAt,
+        subscriptionCanceledAt: canceledAt,
+        subscriptionLastEventAt: eventAt
+      });
+      return res.status(200).json({
+        received: true,
+        eventType,
+        userId: updated.id,
+        planType: updated.planType
+      });
+    } catch (error) {
+      console.error("RevenueCat webhook error:", error);
+      return res.status(500).json({ message: "Server error" });
     }
   });
   app2.get("/api/users/search/:identifier", requireAuth, async (req, res) => {
@@ -575,23 +839,22 @@ async function registerRoutes(app2) {
       if (med.currentStock > 0) {
         await storage.updateMedicationStock(medId, med.currentStock - 1);
       }
-      const newStock = med.currentStock - 1;
+      const newStock = Math.max(0, med.currentStock - 1);
       try {
-        const conns = await storage.getConnectionsByDependent(userId);
-        const acceptedConns = conns.filter((c) => c.status === "ACCEPTED");
         const dependent = await storage.getUserById(userId);
+        const supervisorRecipients = dependent?.role === "DEPENDENT" ? await getMasterAndControllerRecipients(userId) : [];
         if (newStock === 0) {
-          await storage.createNotification({
+          await createInAppAndPushNotification({
             userId,
             type: "STOCK_EMPTY",
             title: "Estoque Zerado",
             message: `${med.name} est\xE1 sem estoque. Reponha o quanto antes.`,
             relatedId: medId
           });
-          if (dependent && acceptedConns.length > 0) {
-            for (const conn of acceptedConns) {
-              await storage.createNotification({
-                userId: conn.masterId,
+          if (dependent && supervisorRecipients.length > 0) {
+            for (const recipientId of supervisorRecipients) {
+              await createInAppAndPushNotification({
+                userId: recipientId,
                 type: "STOCK_EMPTY",
                 title: "Estoque Zerado",
                 message: `${dependent.name}: ${med.name} sem estoque`,
@@ -600,17 +863,17 @@ async function registerRoutes(app2) {
             }
           }
         } else if (newStock > 0 && newStock <= med.alertThreshold) {
-          await storage.createNotification({
+          await createInAppAndPushNotification({
             userId,
             type: "STOCK_LOW",
             title: "Estoque Baixo",
             message: `${med.name} com apenas ${newStock} unidades restantes`,
             relatedId: medId
           });
-          if (dependent && acceptedConns.length > 0) {
-            for (const conn of acceptedConns) {
-              await storage.createNotification({
-                userId: conn.masterId,
+          if (dependent && supervisorRecipients.length > 0) {
+            for (const recipientId of supervisorRecipients) {
+              await createInAppAndPushNotification({
+                userId: recipientId,
                 type: "STOCK_LOW",
                 title: "Estoque Baixo",
                 message: `${dependent.name}: ${med.name} com apenas ${newStock} unidades restantes`,
@@ -875,6 +1138,111 @@ async function registerRoutes(app2) {
   return httpServer;
 }
 
+// server/services/dose-monitor.ts
+var CHECK_INTERVAL_MS = 60 * 1e3;
+var MISSED_GRACE_MS = 60 * 60 * 1e3;
+var monitorHandle = null;
+function getDueTime(lastTakenMillis, intervalInHours) {
+  return lastTakenMillis + intervalInHours * 60 * 60 * 1e3;
+}
+async function getMastersAndControllersForDependent(dependentId) {
+  const conns = await storage.getConnectionsByDependent(dependentId);
+  const acceptedMasterIds = conns.filter((conn) => conn.status === "ACCEPTED").map((conn) => conn.masterId);
+  const recipients = new Set(acceptedMasterIds);
+  for (const masterId of acceptedMasterIds) {
+    const masterConns = await storage.getConnectionsByMaster(masterId);
+    const accepted = masterConns.filter((conn) => conn.status === "ACCEPTED");
+    for (const conn of accepted) {
+      const linkedUser = await storage.getUserById(conn.dependentId);
+      if (linkedUser?.role === "CONTROLLER") {
+        recipients.add(linkedUser.id);
+      }
+    }
+  }
+  return Array.from(recipients);
+}
+async function processMedicationCycle(medicationId) {
+  const medication = await storage.getMedicationById(medicationId);
+  if (!medication) return;
+  const schedules = await storage.getSchedulesByOwner(medication.ownerId);
+  const medSchedules = schedules.filter((schedule) => schedule.medId === medication.id).sort((a, b) => b.timeMillis - a.timeMillis);
+  const lastTaken = medSchedules.find((schedule) => schedule.status === "TAKEN");
+  if (!lastTaken) return;
+  const now = Date.now();
+  const dueTime = getDueTime(lastTaken.timeMillis, medication.intervalInHours);
+  if (dueTime > now) return;
+  const duePending = medSchedules.find((schedule) => schedule.status === "PENDING" && schedule.timeMillis === dueTime);
+  const dueMissed = medSchedules.find((schedule) => schedule.status === "MISSED" && schedule.timeMillis === dueTime);
+  if (!duePending && !dueMissed) {
+    await storage.createSchedule({
+      medId: medication.id,
+      timeMillis: dueTime,
+      status: "PENDING",
+      confirmedAt: null,
+      ownerId: medication.ownerId
+    });
+    await storage.createNotification({
+      userId: medication.ownerId,
+      type: "DOSE_DUE",
+      title: "Hora do medicamento",
+      message: `Est\xE1 na hora do rem\xE9dio ${medication.name}.`,
+      relatedId: medication.id
+    });
+    await sendPushToUsers([medication.ownerId], {
+      title: "Hora do medicamento",
+      body: `Est\xE1 na hora do rem\xE9dio ${medication.name}.`,
+      data: { type: "DOSE_DUE", relatedId: medication.id }
+    });
+    return;
+  }
+  if (!duePending) return;
+  if (now < dueTime + MISSED_GRACE_MS) return;
+  await storage.updateScheduleStatus(duePending.id, "MISSED");
+  const dependent = await storage.getUserById(medication.ownerId);
+  if (!dependent || dependent.role !== "DEPENDENT") return;
+  const recipients = await getMastersAndControllersForDependent(dependent.id);
+  if (recipients.length === 0) return;
+  const title = "Dose em atraso";
+  const message = `${dependent.name}: dose de ${medication.name} em atraso.`;
+  await Promise.all(
+    recipients.map(
+      (userId) => storage.createNotification({
+        userId,
+        type: "DOSE_MISSED",
+        title,
+        message,
+        relatedId: medication.id
+      })
+    )
+  );
+  await sendPushToUsers(recipients, {
+    title,
+    body: message,
+    data: { type: "DOSE_MISSED", relatedId: medication.id, dependentId: dependent.id }
+  });
+}
+async function runDoseMonitorCycle() {
+  const meds = await storage.getAllMedications();
+  for (const med of meds) {
+    try {
+      await processMedicationCycle(med.id);
+    } catch (error) {
+      console.error("Dose monitor medication cycle error:", med.id, error);
+    }
+  }
+}
+function startDoseMonitor() {
+  if (monitorHandle) return;
+  runDoseMonitorCycle().catch((error) => {
+    console.error("Dose monitor initial cycle error:", error);
+  });
+  monitorHandle = setInterval(() => {
+    runDoseMonitorCycle().catch((error) => {
+      console.error("Dose monitor recurring cycle error:", error);
+    });
+  }, CHECK_INTERVAL_MS);
+}
+
 // server/index.ts
 import * as fs from "fs";
 import * as path from "path";
@@ -1055,6 +1423,7 @@ function setupErrorHandler(app2) {
   });
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
+  startDoseMonitor();
   setupErrorHandler(app);
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(

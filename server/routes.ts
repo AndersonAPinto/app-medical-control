@@ -13,6 +13,7 @@ import {
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import { sendPushToUsers } from "./services/push";
 
 declare module "express-session" {
   interface SessionData {
@@ -70,6 +71,44 @@ function inferInterval(
 
 function hasFutureExpiry(expiresAt: Date | null | undefined): boolean {
   return Boolean(expiresAt && expiresAt.getTime() > Date.now());
+}
+
+async function getMasterAndControllerRecipients(dependentId: string): Promise<string[]> {
+  const dependentConns = await storage.getConnectionsByDependent(dependentId);
+  const acceptedMasterIds = dependentConns
+    .filter((conn) => conn.status === "ACCEPTED")
+    .map((conn) => conn.masterId);
+  const recipients = new Set<string>(acceptedMasterIds);
+
+  for (const masterId of acceptedMasterIds) {
+    const masterConns = await storage.getConnectionsByMaster(masterId);
+    const acceptedConns = masterConns.filter((conn) => conn.status === "ACCEPTED");
+
+    for (const conn of acceptedConns) {
+      const maybeController = await storage.getUserById(conn.dependentId);
+      if (maybeController?.role === "CONTROLLER") {
+        recipients.add(maybeController.id);
+      }
+    }
+  }
+
+  return Array.from(recipients);
+}
+
+async function createInAppAndPushNotification(params: {
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  relatedId?: string;
+}): Promise<void> {
+  const { userId, type, title, message, relatedId } = params;
+  await storage.createNotification({ userId, type, title, message, relatedId });
+  await sendPushToUsers([userId], {
+    title,
+    body: message,
+    data: { type, relatedId },
+  });
 }
 
 function resolvePlanTypeFromSubscription(
@@ -451,7 +490,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/medications", requireAuth, async (req: Request, res: Response) => {
     try {
       const meds = await storage.getMedicationsByOwner(req.session.userId!);
-      res.json(meds);
+      const schedules = await storage.getConfirmedSchedulesByOwner(req.session.userId!);
+      
+      const enrichedMeds = meds.map(med => {
+        const medSchedules = schedules.filter(s => s.medId === med.id);
+        const lastSchedule = medSchedules.length > 0 ? medSchedules[0] : null;
+        return {
+          ...med,
+          lastDoseAt: lastSchedule ? lastSchedule.timeMillis : null
+        };
+      });
+      
+      res.json(enrichedMeds);
     } catch (error) {
       console.error("Get medications error:", error);
       res.status(500).json({ message: "Server error" });
@@ -630,6 +680,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not your medication" });
       }
 
+      const schedules = await storage.getConfirmedSchedulesByOwner(userId);
+      const medSchedules = schedules.filter(s => s.medId === medId);
+      const lastSchedule = medSchedules.length > 0 ? medSchedules[0] : null;
+      if (lastSchedule) {
+        const nextDoseTime = lastSchedule.timeMillis + med.intervalInHours * 60 * 60 * 1000;
+        const canTakeDose = now >= nextDoseTime - 5 * 60 * 1000;
+        if (!canTakeDose) {
+          return res.status(400).json({ message: "Too early to take this dose" });
+        }
+      }
+
       const schedule = await storage.createSchedule({
         medId,
         timeMillis: now,
@@ -642,24 +703,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateMedicationStock(medId, med.currentStock - 1);
       }
 
-      const newStock = med.currentStock - 1;
+      const newStock = Math.max(0, med.currentStock - 1);
       try {
-        const conns = await storage.getConnectionsByDependent(userId);
-        const acceptedConns = conns.filter(c => c.status === "ACCEPTED");
         const dependent = await storage.getUserById(userId);
+        const supervisorRecipients =
+          dependent?.role === "DEPENDENT" ? await getMasterAndControllerRecipients(userId) : [];
 
         if (newStock === 0) {
-          await storage.createNotification({
+          await createInAppAndPushNotification({
             userId,
             type: "STOCK_EMPTY",
             title: "Estoque Zerado",
             message: `${med.name} está sem estoque. Reponha o quanto antes.`,
             relatedId: medId,
           });
-          if (dependent && acceptedConns.length > 0) {
-            for (const conn of acceptedConns) {
-              await storage.createNotification({
-                userId: conn.masterId,
+          if (dependent && supervisorRecipients.length > 0) {
+            for (const recipientId of supervisorRecipients) {
+              await createInAppAndPushNotification({
+                userId: recipientId,
                 type: "STOCK_EMPTY",
                 title: "Estoque Zerado",
                 message: `${dependent.name}: ${med.name} sem estoque`,
@@ -668,17 +729,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } else if (newStock > 0 && newStock <= med.alertThreshold) {
-          await storage.createNotification({
+          await createInAppAndPushNotification({
             userId,
             type: "STOCK_LOW",
             title: "Estoque Baixo",
             message: `${med.name} com apenas ${newStock} unidades restantes`,
             relatedId: medId,
           });
-          if (dependent && acceptedConns.length > 0) {
-            for (const conn of acceptedConns) {
-              await storage.createNotification({
-                userId: conn.masterId,
+          if (dependent && supervisorRecipients.length > 0) {
+            for (const recipientId of supervisorRecipients) {
+              await createInAppAndPushNotification({
+                userId: recipientId,
                 type: "STOCK_LOW",
                 title: "Estoque Baixo",
                 message: `${dependent.name}: ${med.name} com apenas ${newStock} unidades restantes`,
@@ -847,7 +908,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dependents/:id/medications", requireAuth, async (req: Request, res: Response) => {
     try {
       const meds = await storage.getMedicationsByOwner(req.params.id);
-      res.json(meds);
+      const schedules = await storage.getConfirmedSchedulesByOwner(req.params.id);
+      
+      const enrichedMeds = meds.map(med => {
+        const medSchedules = schedules.filter(s => s.medId === med.id);
+        const lastSchedule = medSchedules.length > 0 ? medSchedules[0] : null;
+        return {
+          ...med,
+          lastDoseAt: lastSchedule ? lastSchedule.timeMillis : null
+        };
+      });
+      
+      res.json(enrichedMeds);
     } catch (error) {
       console.error("Get dependent medications error:", error);
       res.status(500).json({ message: "Server error" });

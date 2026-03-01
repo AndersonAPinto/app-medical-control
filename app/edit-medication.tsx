@@ -21,14 +21,6 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
-const intervals = [
-  { label: "4h", value: 4 },
-  { label: "6h", value: 6 },
-  { label: "8h", value: 8 },
-  { label: "12h", value: 12 },
-  { label: "24h", value: 24 },
-];
-
 interface Medication {
   id: string;
   name: string;
@@ -52,6 +44,8 @@ export default function EditMedicationScreen() {
   const [intervalInHours, setIntervalInHours] = useState(8);
   const [loaded, setLoaded] = useState(false);
   const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
+  const canDecrementInterval = intervalInHours > 1;
+  const canIncrementInterval = intervalInHours < 24;
 
   const showError = (message: string) => {
     setDialog({ title: "Não foi possível atualizar", message });
@@ -110,25 +104,28 @@ export default function EditMedicationScreen() {
   const handleAddStock = () => {
     Haptics.selectionAsync();
     const current = parseInt(currentStock, 10) || 0;
-    Alert.prompt
-      ? Alert.prompt(
-          "Adicionar estoque",
-          "Quantas unidades deseja adicionar?",
-          [
-            { text: "Cancelar", style: "cancel" },
-            {
-              text: "Adicionar",
-              onPress: (val: string | undefined) => {
-                const add = parseInt(val || "0", 10);
-                if (add > 0) setCurrentStock(String(current + add));
-              },
+    if (Alert.prompt) {
+      Alert.prompt(
+        "Adicionar estoque",
+        "Quantas unidades deseja adicionar?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Adicionar",
+            onPress: (val: string | undefined) => {
+              const add = parseInt(val || "0", 10);
+              if (add > 0) setCurrentStock(String(current + add));
             },
-          ],
-          "plain-text",
-          "",
-          "number-pad"
-        )
-      : setCurrentStock(String(current + 10));
+          },
+        ],
+        "plain-text",
+        "",
+        "number-pad"
+      );
+      return;
+    }
+
+    setCurrentStock(String(current + 10));
   };
 
   if (medQuery.isLoading) {
@@ -182,25 +179,44 @@ export default function EditMedicationScreen() {
         </View>
 
         <Text style={[styles.label, { color: colors.text }]}>Intervalo entre doses</Text>
-        <View style={styles.intervalRow}>
-          {intervals.map((i) => (
-            <Pressable
-              key={i.value}
-              style={[
-                styles.intervalChip,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                intervalInHours === i.value && { borderColor: colors.tint, backgroundColor: colors.tintLight },
-              ]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setIntervalInHours(i.value);
-              }}
-            >
-              <Text style={[styles.intervalText, { color: colors.textSecondary }, intervalInHours === i.value && { color: colors.tint }]}>
-                {i.label}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={styles.intervalControlRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.intervalAdjustBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              !canDecrementInterval && { opacity: 0.5 },
+              pressed && canDecrementInterval && styles.intervalBtnPressed,
+            ]}
+            disabled={!canDecrementInterval}
+            onPress={() => {
+              if (!canDecrementInterval) return;
+              Haptics.selectionAsync();
+              setIntervalInHours((prev) => Math.max(1, prev - 1));
+            }}
+          >
+            <Ionicons name="remove" size={20} color={colors.text} />
+          </Pressable>
+
+          <View style={[styles.intervalValueBox, { backgroundColor: colors.tintLight, borderColor: colors.tint }]}>
+            <Text style={[styles.intervalValueText, { color: colors.tint }]}>{intervalInHours}h</Text>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.intervalAdjustBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              !canIncrementInterval && { opacity: 0.5 },
+              pressed && canIncrementInterval && styles.intervalBtnPressed,
+            ]}
+            disabled={!canIncrementInterval}
+            onPress={() => {
+              if (!canIncrementInterval) return;
+              Haptics.selectionAsync();
+              setIntervalInHours((prev) => Math.min(24, prev + 1));
+            }}
+          >
+            <Ionicons name="add" size={20} color={colors.text} />
+          </Pressable>
         </View>
 
         <View style={styles.stockRow}>
@@ -336,21 +352,33 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_400Regular",
   },
-  intervalRow: {
+  intervalControlRow: {
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
+    gap: 12,
     marginTop: 4,
   },
-  intervalChip: {
-    flex: 1,
+  intervalAdjustBtn: {
+    width: 52,
     height: 44,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
+    borderWidth: 1,
   },
-  intervalText: {
-    fontSize: 15,
+  intervalBtnPressed: {
+    opacity: 0.8,
+  },
+  intervalValueBox: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  intervalValueText: {
+    fontSize: 17,
     fontFamily: "Inter_600SemiBold",
   },
   stockRow: {

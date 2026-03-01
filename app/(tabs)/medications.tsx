@@ -28,6 +28,7 @@ interface Medication {
   alertThreshold: number;
   intervalInHours: number;
   ownerId: string;
+  lastDoseAt?: number | null;
 }
 
 interface HistoryEntry {
@@ -46,6 +47,7 @@ function MedicationDetailCard({ med, onDeleteRequest, onEdit, colors }: { med: M
   const stockPercentage = med.alertThreshold > 0
     ? Math.min((med.currentStock / (med.alertThreshold * 3)) * 100, 100)
     : 100;
+  const nextDoseTime = med.lastDoseAt ? med.lastDoseAt + med.intervalInHours * 3600000 : null;
 
   return (
     <Pressable
@@ -66,6 +68,11 @@ function MedicationDetailCard({ med, onDeleteRequest, onEdit, colors }: { med: M
         <View style={styles.detailInfo}>
           <Text style={[styles.detailName, { color: colors.text }]}>{med.name}</Text>
           <Text style={[styles.detailDosage, { color: colors.textSecondary }]}>{med.dosage}</Text>
+          {nextDoseTime && (
+            <Text style={[styles.detailDosage, { color: colors.warning, marginTop: 2, fontSize: 12 }]}>
+              Próxima: {new Date(nextDoseTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          )}
         </View>
         <Pressable
           onPress={() => {

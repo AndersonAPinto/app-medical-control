@@ -14,7 +14,8 @@ import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import Colors from "@/constants/colors";
 
-const REVENUECAT_ANDROID_API_KEY = "goog_ieyHTSlFYWXokTJsvLmpHdolMew";
+//const REVENUECAT_ANDROID_API_KEY = "goog_ieyHTSlFYWXokTJsvLmpHdolMew";
+const REVENUECAT_ANDROID_API_KEY = "test_klZXlxvdfQdnoaXBSnMSNEBmoeG";
 
 SplashScreen.preventAutoHideAsync();
 

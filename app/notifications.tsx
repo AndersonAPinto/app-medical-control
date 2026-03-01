@@ -45,6 +45,10 @@ function formatRelativeTime(dateStr: string): string {
 
 function getNotificationIcon(type: string): { name: keyof typeof Ionicons.glyphMap; colorKey: "warning" | "danger" | "tint" | "success" } {
   switch (type) {
+    case "DOSE_DUE":
+      return { name: "alarm-outline", colorKey: "tint" };
+    case "DOSE_MISSED":
+      return { name: "alert-circle-outline", colorKey: "danger" };
     case "STOCK_LOW":
       return { name: "cube-outline", colorKey: "warning" };
     case "STOCK_EMPTY":
