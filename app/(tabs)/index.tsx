@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { cardShadow, smallShadow } from "@/lib/shadows";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { cancelMedicationNotifications, scheduleNextDoseNotification } from "@/lib/push-notifications";
 
 interface Medication {
   id: string;
@@ -194,9 +195,15 @@ export default function DashboardScreen() {
   const confirmMutation = useMutation({
     mutationFn: async (med: Medication) => {
       await apiRequest("POST", `/api/medications/${med.id}/take-dose`);
+      return med;
     },
-    onSuccess: () => {
+    onSuccess: async (med: Medication) => {
       setConfirmMed(null);
+      
+      await cancelMedicationNotifications(med.id);
+      const nextDoseTime = Date.now() + med.intervalInHours * 60 * 60 * 1000;
+      await scheduleNextDoseNotification(med.id, med.name, nextDoseTime);
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/schedules/history"] });

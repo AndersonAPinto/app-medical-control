@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import { cardShadow, smallShadow } from "@/lib/shadows";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { cancelMedicationNotifications } from "@/lib/push-notifications";
 
 interface Medication {
   id: string;
@@ -172,9 +173,11 @@ export default function MedicationsScreen() {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/medications/${id}`);
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: async (deletedId) => {
       setConfirmDelete(null);
+      await cancelMedicationNotifications(deletedId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
     },

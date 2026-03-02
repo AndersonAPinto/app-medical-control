@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import { useAuth } from "@/lib/auth-context";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { scheduleNextDoseNotification } from "@/lib/push-notifications";
 
 export default function AddMedicationScreen() {
   const insets = useSafeAreaInsets();
@@ -100,7 +101,11 @@ export default function AddMedicationScreen() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      if (data && data.id) {
+        const nextDoseTime = Date.now() + intervalInHours * 60 * 60 * 1000;
+        await scheduleNextDoseNotification(data.id, data.name, nextDoseTime);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
       router.back();
