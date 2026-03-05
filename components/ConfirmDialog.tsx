@@ -113,7 +113,7 @@ export default function ConfirmDialog({
                   style={[styles.btnText, { color: colors.textSecondary }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.85}
+                  minimumFontScale={0.75}
                 >
                   {cancelLabel}
                 </Text>
@@ -140,7 +140,7 @@ export default function ConfirmDialog({
                   style={[styles.btnText, { color: "#fff" }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.85}
+                  minimumFontScale={0.75}
                 >
                   {confirmLabel}
                 </Text>
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   btnText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "600" as const,
     textAlign: "center",
     flexShrink: 1,
