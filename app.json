@@ -2,7 +2,7 @@
   "expo": {
     "name": "Toma Aí",
     "slug": "medcontrol",
-    "version": "1.3.4",
+    "version": "1.3.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "medcontrol",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.medcontrol.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#0D9488",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

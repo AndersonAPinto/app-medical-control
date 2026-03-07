@@ -90,7 +90,7 @@ export default function PrivacyPolicyScreen() {
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>9. Contato</Text>
         <Text style={[styles.paragraph, { color: colors.textSecondary }]}>
-          Para dúvidas sobre privacidade ou seus dados, entre em contato pelo e-mail: suporte@tomaai.app
+          Para dúvidas sobre privacidade ou seus dados, entre em contato pelo e-mail: contato@apptomaai.com.br
         </Text>
       </ScrollView>
     </View>
