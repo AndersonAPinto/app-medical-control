@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.medcontrol.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#0D9488",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -29,7 +29,9 @@
       "permissions": [
         "INTERNET",
         "VIBRATE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {
@@ -45,7 +47,8 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#0D9488"
         }
-      ]
+      ],
+      "react-native-purchases"
     ],
     "experiments": {
       "typedRoutes": true,

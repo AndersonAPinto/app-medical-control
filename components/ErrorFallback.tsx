@@ -80,11 +80,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
 
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.text }]}>
-          Something went wrong
+          Algo deu errado
         </Text>
 
         <Text style={[styles.message, { color: theme.textSecondary }]}>
-          Please reload the app to continue.
+          Recarregue o aplicativo para continuar.
         </Text>
 
         <Pressable
@@ -100,7 +100,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           ]}
         >
           <Text style={[styles.buttonText, { color: theme.buttonText }]}>
-            Try Again
+            Tentar Novamente
           </Text>
         </Pressable>
       </View>
@@ -130,7 +130,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                 ]}
               >
                 <Text style={[styles.modalTitle, { color: theme.text }]}>
-                  Error Details
+                  Detalhes do Erro
                 </Text>
                 <Pressable
                   onPress={() => setIsModalVisible(false)}

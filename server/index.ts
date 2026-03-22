@@ -1,5 +1,6 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { startDoseMonitor } from "./services/dose-monitor";
 import * as fs from "fs";
@@ -7,6 +8,8 @@ import * as path from "path";
 
 const app = express();
 const log = console.log;
+
+app.use(helmet());
 
 declare module "http" {
   interface IncomingMessage {

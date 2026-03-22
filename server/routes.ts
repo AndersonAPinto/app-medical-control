@@ -121,8 +121,11 @@ function resolvePlanTypeFromSubscription(
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction && !process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET must be set in production");
+  if (!process.env.SESSION_SECRET) {
+    if (isProduction) {
+      throw new Error("SESSION_SECRET must be set in production");
+    }
+    console.warn("WARNING: SESSION_SECRET not set. Using insecure default for development only.");
   }
 
   if (isProduction) {
@@ -261,21 +264,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/upgrade", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const now = new Date();
-      const updated = await storage.updateUser(req.session.userId!, {
-        planType: "PREMIUM",
-        subscriptionStatus: "ACTIVE",
-        subscriptionWillRenew: true,
-        subscriptionStartedAt: now,
-      });
-      const { password: _, ...safeUser } = updated;
-      res.json(safeUser);
-    } catch (error) {
-      console.error("Upgrade error:", error);
-      res.status(500).json({ message: "Server error" });
-    }
+  // Endpoint desabilitado - upgrade deve ser feito via RevenueCat/Google Play
+  app.post("/api/auth/upgrade", requireAuth, async (_req: Request, res: Response) => {
+    return res.status(403).json({ message: "Upgrade deve ser realizado através da loja de aplicativos" });
   });
 
   app.post("/api/auth/sync-plan", requireAuth, async (req: Request, res: Response) => {
@@ -365,7 +356,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = req.header("authorization") || "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim();
 
-      if (webhookSecret && token !== webhookSecret) {
+      if (!webhookSecret) {
+        return res.status(503).json({ message: "Webhook not configured" });
+      }
+      if (token !== webhookSecret) {
         return res.status(401).json({ message: "Invalid webhook token" });
       }
 
@@ -514,6 +508,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!med) {
         return res.status(404).json({ message: "Medication not found" });
       }
+      if (med.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Acesso negado" });
+      }
       res.json(med);
     } catch (error) {
       console.error("Get medication error:", error);
@@ -590,6 +587,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { currentStock } = req.body;
       if (typeof currentStock !== "number" || currentStock < 0) {
         return res.status(400).json({ message: "Invalid stock value" });
+      }
+      const med = await storage.getMedicationById(req.params.id);
+      if (!med) {
+        return res.status(404).json({ message: "Medication not found" });
+      }
+      if (med.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Acesso negado" });
       }
       await storage.updateMedicationStock(req.params.id, currentStock);
       res.json({ message: "Stock updated" });
@@ -867,6 +871,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/connections/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const connsByMaster = await storage.getConnectionsByMaster(req.session.userId!);
+      const connsByDep = await storage.getConnectionsByDependent(req.session.userId!);
+      const allConns = [...connsByMaster, ...connsByDep];
+      const conn = allConns.find(c => c.id === req.params.id);
+      if (!conn) {
+        return res.status(403).json({ message: "Você não tem permissão para remover esta conexão" });
+      }
       await storage.deleteConnection(req.params.id);
       res.json({ message: "Connection removed" });
     } catch (error) {
@@ -877,11 +888,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/connections/:id/accept", requireAuth, async (req: Request, res: Response) => {
     try {
+      const conns = await storage.getConnectionsByDependent(req.session.userId!);
+      const conn = conns.find(c => c.id === req.params.id);
+      if (!conn) {
+        return res.status(403).json({ message: "Você não tem permissão para aceitar esta conexão" });
+      }
       await storage.acceptConnection(req.params.id);
 
       try {
-        const conns = await storage.getConnectionsByDependent(req.session.userId!);
-        const conn = conns.find(c => c.id === req.params.id);
         if (conn) {
           const dependent = await storage.getUserById(conn.dependentId);
           if (dependent) {
@@ -907,6 +921,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dependents/:id/medications", requireAuth, async (req: Request, res: Response) => {
     try {
+      const masterConns = await storage.getConnectionsByMaster(req.session.userId!);
+      const hasAccess = masterConns.some(
+        c => c.dependentId === req.params.id && c.status === "ACCEPTED"
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Você não tem acesso aos medicamentos deste dependente" });
+      }
       const meds = await storage.getMedicationsByOwner(req.params.id);
       const schedules = await storage.getConfirmedSchedulesByOwner(req.params.id);
       

@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Dimensions,
   ScrollView,
   Platform,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  useWindowDimensions,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,8 +17,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const ONBOARDING_KEY = "onboarding_completed";
 
@@ -72,11 +70,12 @@ const slides: OnboardingSlide[] = [
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const index = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
     if (index !== currentIndex) {
       setCurrentIndex(index);
     }
@@ -85,7 +84,7 @@ export default function OnboardingScreen() {
   const goNext = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (currentIndex < slides.length - 1) {
-      scrollRef.current?.scrollTo({ x: SCREEN_WIDTH * (currentIndex + 1), animated: true });
+      scrollRef.current?.scrollTo({ x: screenWidth * (currentIndex + 1), animated: true });
     } else {
       finishOnboarding();
     }
@@ -97,7 +96,11 @@ export default function OnboardingScreen() {
   };
 
   const finishOnboarding = async () => {
-    await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+    } catch (err) {
+      console.error("Failed to save onboarding state:", err);
+    }
     router.replace("/login");
   };
 
@@ -139,7 +142,7 @@ export default function OnboardingScreen() {
           bounces={false}
         >
           {slides.map((slide, index) => (
-            <View key={index} style={[styles.slide, { width: SCREEN_WIDTH }]}>
+            <View key={index} style={[styles.slide, { width: screenWidth }]}>
               <View style={[styles.iconCircle, { backgroundColor: slide.iconBg }]}>
                 <Ionicons name={slide.icon} size={56} color={slide.iconColor} />
               </View>

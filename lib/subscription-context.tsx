@@ -84,8 +84,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       if (Platform.OS === "web" || !rcConfigured) {
-        await syncPlanToBackend({ planType: "PREMIUM" });
-        return;
+        throw new Error("Assinatura disponível apenas no aplicativo Android");
       }
       const Purchases = require("react-native-purchases").default;
       const offerings = await Purchases.getOfferings();
@@ -108,8 +107,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       if (Platform.OS === "web" || !rcConfigured) {
-        await syncPlanToBackend({ planType: "PREMIUM" });
-        return;
+        throw new Error("Assinatura disponível apenas no aplicativo Android");
       }
       const Purchases = require("react-native-purchases").default;
       const offerings = await Purchases.getOfferings();

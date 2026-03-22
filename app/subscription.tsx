@@ -248,7 +248,7 @@ export default function SubscriptionScreen() {
             ]}
           >
             <View style={[styles.discountBadge, { backgroundColor: colors.success }]}>
-              <Text style={styles.discountBadgeText}>-33%</Text>
+              <Text style={styles.discountBadgeText}>-20%</Text>
             </View>
             <View style={styles.planCardContent}>
               <Text style={[styles.planName, { color: colors.text }]}>Anual</Text>
@@ -360,8 +360,26 @@ export default function SubscriptionScreen() {
         </Pressable>
 
         <Text style={[styles.legalText, { color: colors.textSecondary }]}>
-          A assinatura é renovada automaticamente. Você pode cancelar a qualquer momento nas configurações da Google Play Store.
+          Ao assinar, você será cobrado {selectedPlan === "monthly" ? "R$ 24,90 por mês" : "R$ 240,00 por ano"}.{" "}
+          A assinatura é renovada automaticamente até ser cancelada.{" "}
+          Você pode cancelar a qualquer momento nas configurações da Google Play Store.{" "}
+          Nenhum reembolso será feito para o período parcial.
         </Text>
+        <View style={styles.legalLinksRow}>
+          <Pressable
+            style={({ pressed }) => [styles.legalLinkBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => router.push("/privacy-policy")}
+          >
+            <Text style={[styles.legalLinkText, { color: colors.tint }]}>Política de Privacidade</Text>
+          </Pressable>
+          <Text style={[styles.legalLinkSeparator, { color: colors.textSecondary }]}>|</Text>
+          <Pressable
+            style={({ pressed }) => [styles.legalLinkBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => router.push("/terms-of-service" as any)}
+          >
+            <Text style={[styles.legalLinkText, { color: colors.tint }]}>Termos de Uso</Text>
+          </Pressable>
+        </View>
         <Pressable
           style={({ pressed }) => [styles.restoreBtn, pressed && { opacity: 0.7 }]}
           onPress={handleOpenCancelLink}
@@ -600,6 +618,24 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 8,
     paddingHorizontal: 16,
+  },
+  legalLinksRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    gap: 8,
+  },
+  legalLinkBtn: {
+    padding: 4,
+  },
+  legalLinkText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    textDecorationLine: "underline",
+  },
+  legalLinkSeparator: {
+    fontSize: 12,
   },
   premiumActiveContainer: {
     flex: 1,
