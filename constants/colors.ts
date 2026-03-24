@@ -28,7 +28,7 @@ const palette = {
 
 const light = {
   text: palette.slate900,
-  textSecondary: palette.slate500,
+  textSecondary: palette.slate600,
   background: palette.slate50,
   surface: palette.white,
   tint: palette.teal600,
@@ -50,14 +50,14 @@ const light = {
 const dark: typeof light = {
   text: palette.slate100,
   textSecondary: palette.slate400,
-  background: "#0B1120",
+  background: "#121826",
   surface: palette.slate800,
-  tint: palette.teal400,
-  tintLight: "rgba(13, 148, 136, 0.15)",
+  tint: palette.teal500,
+  tintLight: "rgba(20, 184, 166, 0.18)",
   accent: palette.teal500,
   border: palette.slate700,
   tabIconDefault: palette.slate500,
-  tabIconSelected: palette.teal400,
+  tabIconSelected: palette.teal500,
   danger: palette.red500,
   dangerLight: "rgba(239, 68, 68, 0.15)",
   warning: palette.amber500,

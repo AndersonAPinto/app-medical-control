@@ -12,7 +12,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
@@ -86,20 +85,13 @@ function groupNotificationsByDate(notifications: Notification[]): NotificationSe
 
 function getNotificationIcon(type: string): { name: keyof typeof Ionicons.glyphMap; colorKey: "warning" | "danger" | "tint" | "success" } {
   switch (type) {
-    case "DOSE_DUE":
-      return { name: "alarm-outline", colorKey: "tint" };
-    case "DOSE_MISSED":
-      return { name: "alert-circle-outline", colorKey: "danger" };
-    case "STOCK_LOW":
-      return { name: "cube-outline", colorKey: "warning" };
-    case "STOCK_EMPTY":
-      return { name: "cube", colorKey: "danger" };
-    case "CONNECTION_REQUEST":
-      return { name: "person-add-outline", colorKey: "tint" };
-    case "CONNECTION_ACCEPTED":
-      return { name: "checkmark-circle-outline", colorKey: "success" };
-    default:
-      return { name: "notifications-outline", colorKey: "tint" };
+    case "DOSE_DUE": return { name: "alarm-outline", colorKey: "tint" };
+    case "DOSE_MISSED": return { name: "alert-circle-outline", colorKey: "danger" };
+    case "STOCK_LOW": return { name: "cube-outline", colorKey: "warning" };
+    case "STOCK_EMPTY": return { name: "cube", colorKey: "danger" };
+    case "CONNECTION_REQUEST": return { name: "person-add-outline", colorKey: "tint" };
+    case "CONNECTION_ACCEPTED": return { name: "checkmark-circle-outline", colorKey: "success" };
+    default: return { name: "notifications-outline", colorKey: "tint" };
   }
 }
 
@@ -113,12 +105,7 @@ function getIconBgColor(colorKey: string, colors: typeof Colors.light): string {
 }
 
 function NotificationCard({
-  notification,
-  colors,
-  onPress,
-  onTakeNow,
-  onSkip,
-  isTaking,
+  notification, colors, onPress, onTakeNow, onSkip, isTaking,
 }: {
   notification: Notification;
   colors: typeof Colors.light;
@@ -154,15 +141,11 @@ function NotificationCard({
         <Text style={[styles.cardTime, { color: colors.textSecondary }]}>
           {formatRelativeTime(notification.createdAt)}
         </Text>
-
         {isDoseAction && notification.relatedId && (
           <View style={styles.actionRow}>
             <Pressable
               style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.successLight }, pressed && { opacity: 0.7 }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onTakeNow?.();
-              }}
+              onPress={(e) => { e.stopPropagation(); onTakeNow?.(); }}
               disabled={isTaking}
             >
               {isTaking ? (
@@ -176,10 +159,7 @@ function NotificationCard({
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.inputBg }, pressed && { opacity: 0.7 }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onSkip?.();
-              }}
+              onPress={(e) => { e.stopPropagation(); onSkip?.(); }}
             >
               <Text style={[styles.actionBtnText, { color: colors.textSecondary }]}>Pular</Text>
             </Pressable>
@@ -190,7 +170,7 @@ function NotificationCard({
   );
 }
 
-export default function NotificationsScreen() {
+export default function NotificationsTabScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
@@ -229,77 +209,29 @@ export default function NotificationsScreen() {
       setTakingId(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await cancelMedicationNotifications(medId);
-      const nextDoseTime = Date.now() + 8 * 60 * 60 * 1000; // fallback 8h
+      const nextDoseTime = Date.now() + 8 * 60 * 60 * 1000;
       await scheduleNextDoseNotification(medId, "", nextDoseTime);
       markReadMutation.mutate(notifId);
       queryClient.invalidateQueries({ queryKey: ["/api/medications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules/history"] });
     },
-    onError: () => {
-      setTakingId(null);
-    },
+    onError: () => setTakingId(null),
   });
 
   const notifications = notificationsQuery.data || [];
   const sections = groupNotificationsByDate(notifications);
 
-  const handleNotificationPress = (notification: Notification) => {
-    if (!notification.read) {
-      markReadMutation.mutate(notification.id);
-    }
-  };
-
-  const handleTakeNow = (notification: Notification) => {
-    if (!notification.relatedId) return;
-    setTakingId(notification.id);
-    takeDoseMutation.mutate({ medId: notification.relatedId, notifId: notification.id });
-  };
-
-  const handleSkip = (notification: Notification) => {
-    markReadMutation.mutate(notification.id);
-  };
-
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIcon, { backgroundColor: colors.inputBg }]}>
-        <Ionicons name="notifications-outline" size={36} color={colors.textSecondary} />
-      </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma notificação</Text>
-      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Você está em dia com tudo!</Text>
-    </View>
-  );
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: colors.surface,
-            borderBottomColor: colors.border,
-            paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12,
-          },
-        ]}
-      >
-        <Pressable style={styles.headerSideBtn} onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-          Notificações
-        </Text>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border, paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12 }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Notificações</Text>
         <Pressable
           style={styles.headerAction}
           onPress={() => markAllReadMutation.mutate()}
           disabled={markAllReadMutation.isPending}
           hitSlop={8}
         >
-          <Text
-            style={[styles.markAllText, { color: colors.tint }, markAllReadMutation.isPending && { opacity: 0.5 }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.85}
-          >
-            Marcar como lidas
+          <Text style={[styles.markAllText, { color: colors.tint }, markAllReadMutation.isPending && { opacity: 0.5 }]}>
+            Marcar lidas
           </Text>
         </Pressable>
       </View>
@@ -316,9 +248,13 @@ export default function NotificationsScreen() {
             <NotificationCard
               notification={item}
               colors={colors}
-              onPress={() => handleNotificationPress(item)}
-              onTakeNow={() => handleTakeNow(item)}
-              onSkip={() => handleSkip(item)}
+              onPress={() => { if (!item.read) markReadMutation.mutate(item.id); }}
+              onTakeNow={() => {
+                if (!item.relatedId) return;
+                setTakingId(item.id);
+                takeDoseMutation.mutate({ medId: item.relatedId, notifId: item.id });
+              }}
+              onSkip={() => markReadMutation.mutate(item.id)}
               isTaking={takingId === item.id}
             />
           )}
@@ -329,12 +265,20 @@ export default function NotificationsScreen() {
           )}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: 20 + (Platform.OS === "web" ? 34 : 0) },
+            { paddingBottom: 100 + (Platform.OS === "web" ? 34 : 0) },
             notifications.length === 0 && styles.emptyList,
           ]}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={renderEmpty}
           stickySectionHeadersEnabled={false}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.inputBg }]}>
+                <Ionicons name="notifications-outline" size={36} color={colors.textSecondary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>Nenhuma notificação</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Você está em dia com tudo!</Text>
+            </View>
+          )}
           refreshControl={
             <RefreshControl
               refreshing={notificationsQuery.isFetching && !notificationsQuery.isLoading}
@@ -349,37 +293,25 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  headerSideBtn: {
-    width: 28,
-    alignItems: "flex-start",
-    justifyContent: "center",
-  },
   headerTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-    textAlign: "center",
-    marginHorizontal: 10,
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
   },
   headerAction: {
-    minWidth: 110,
-    maxWidth: "45%",
     alignItems: "flex-end",
   },
   markAllText: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
-    textAlign: "right",
   },
   loadingContainer: {
     flex: 1,
@@ -402,9 +334,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     gap: 8,
   },
-  emptyList: {
-    flex: 1,
-  },
+  emptyList: { flex: 1 },
   card: {
     borderRadius: 14,
     padding: 14,
@@ -423,9 +353,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cardContent: {
-    flex: 1,
-  },
+  cardContent: { flex: 1 },
   cardTitle: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",

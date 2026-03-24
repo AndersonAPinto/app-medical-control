@@ -6,11 +6,18 @@ import { SymbolView } from "expo-symbols";
 import { Platform, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
 
 function NativeTabLayout() {
+  const unreadQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadQuery.data?.count ?? 0;
+
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -20,6 +27,10 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="medications">
         <Icon sf={{ default: "pills", selected: "pills.fill" }} />
         <Label>Remédios</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="notifications">
+        <Icon sf={{ default: "bell", selected: "bell.fill" }} />
+        <Label>Avisos</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
@@ -32,6 +43,12 @@ function NativeTabLayout() {
 function ClassicTabLayout() {
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
+
+  const unreadQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadQuery.data?.count ?? 0;
 
   return (
     <Tabs
@@ -80,6 +97,20 @@ function ClassicTabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="medkit-outline" size={size} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Avisos",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" size={size} color={color} />
+          ),
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
+          tabBarBadgeStyle: {
+            fontSize: 10,
+            fontFamily: "Inter_700Bold",
+          },
         }}
       />
       <Tabs.Screen

@@ -11,6 +11,15 @@
         "EXPO_PUBLIC_API_URL": "http://localhost:5000"
       }
     },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://app-medical-control-production.up.railway.app"
+      }
+    },
     "staging": {
       "distribution": "internal",
       "channel": "staging",

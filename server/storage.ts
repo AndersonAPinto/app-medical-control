@@ -13,6 +13,7 @@ import {
   connections,
   notifications,
   pushTokens,
+  passwordResetTokens,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -82,6 +83,11 @@ export interface IStorage {
   registerPushToken(userId: string, token: string): Promise<PushToken>;
   getPushTokensByUser(userId: string): Promise<PushToken[]>;
   deletePushToken(token: string): Promise<void>;
+  updatePassword(userId: string, hashedPassword: string): Promise<void>;
+  createPasswordResetCode(userId: string, code: string, expiresAt: Date): Promise<void>;
+  getPasswordResetByCode(code: string): Promise<{ id: string; userId: string; expiresAt: Date } | undefined>;
+  deletePasswordResetCode(id: string): Promise<void>;
+  deleteExpiredPasswordResetCodes(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -248,6 +254,29 @@ export class DatabaseStorage implements IStorage {
 
   async deletePushToken(token: string): Promise<void> {
     await db.delete(pushTokens).where(eq(pushTokens.token, token));
+  }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<void> {
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+  }
+
+  async createPasswordResetCode(userId: string, code: string, expiresAt: Date): Promise<void> {
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    await db.insert(passwordResetTokens).values({ userId, code, expiresAt });
+  }
+
+  async getPasswordResetByCode(code: string): Promise<{ id: string; userId: string; expiresAt: Date } | undefined> {
+    const [row] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.code, code));
+    if (!row) return undefined;
+    return { id: row.id, userId: row.userId, expiresAt: row.expiresAt! };
+  }
+
+  async deletePasswordResetCode(id: string): Promise<void> {
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, id));
+  }
+
+  async deleteExpiredPasswordResetCodes(): Promise<void> {
+    await db.delete(passwordResetTokens).where(sql`expires_at < now()`);
   }
 
   async getDependentsForMaster(masterId: string): Promise<User[]> {

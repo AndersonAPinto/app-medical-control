@@ -112,6 +112,10 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
+          <Pressable style={styles.forgotBtn} onPress={() => router.push("/forgot-password")}>
+            <Text style={styles.forgotText}>Esqueci minha senha</Text>
+          </Pressable>
+
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>ou</Text>
@@ -230,6 +234,16 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
+  },
+  forgotBtn: {
+    alignItems: "center",
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  forgotText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.tint,
   },
   divider: {
     flexDirection: "row",

@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import { cardShadow, smallShadow } from "@/lib/shadows";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { SkeletonList } from "@/components/SkeletonCard";
 import { cancelMedicationNotifications } from "@/lib/push-notifications";
 
 interface Medication {
@@ -50,6 +51,8 @@ function MedicationDetailCard({ med, onDeleteRequest, onEdit, colors }: { med: M
     : 100;
   const nextDoseTime = med.lastDoseAt ? med.lastDoseAt + med.intervalInHours * 3600000 : null;
 
+  const barColor = isOutOfStock ? colors.danger : isLowStock ? colors.warning : colors.tint;
+
   return (
     <Pressable
       onPress={() => {
@@ -58,6 +61,7 @@ function MedicationDetailCard({ med, onDeleteRequest, onEdit, colors }: { med: M
       }}
       style={({ pressed }) => [styles.detailCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow), pressed && { opacity: 0.9 }]}
     >
+      <View style={[styles.statusBar, { backgroundColor: barColor }]} />
       <View style={styles.detailHeader}>
         <View style={[styles.medIcon, { backgroundColor: colors.tintLight }, isOutOfStock && { backgroundColor: colors.dangerLight }, isLowStock && !isOutOfStock && { backgroundColor: colors.warningLight }]}>
           <Ionicons
@@ -228,9 +232,7 @@ export default function MedicationsScreen() {
       {activeTab === "remedios" ? (
         <>
           {medsQuery.isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.tint} />
-            </View>
+            <SkeletonList count={3} />
           ) : medications.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="medkit-outline" size={56} color={colors.border} />
@@ -264,9 +266,7 @@ export default function MedicationsScreen() {
       ) : (
         <>
           {historyQuery.isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.tint} />
-            </View>
+            <SkeletonList count={3} />
           ) : history.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="time-outline" size={56} color={colors.border} />
@@ -341,9 +341,9 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   addBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -379,6 +379,17 @@ const styles = StyleSheet.create({
   detailCard: {
     borderRadius: 18,
     padding: 16,
+    paddingLeft: 20,
+    overflow: "hidden",
+  },
+  statusBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: 18,
+    borderBottomLeftRadius: 18,
   },
   detailHeader: {
     flexDirection: "row",
@@ -396,7 +407,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailName: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "Inter_600SemiBold",
   },
   detailDosage: {

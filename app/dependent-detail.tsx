@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
-import { cardShadow } from "@/lib/shadows";
+import { cardShadow, smallShadow } from "@/lib/shadows";
 
 interface HistoryEntry {
   id: string;
@@ -62,11 +62,14 @@ function HistoryItem({ item, colors }: { item: HistoryEntry; colors: typeof Colo
   );
 }
 
+type PeriodFilter = "7d" | "30d" | "all";
+
 export default function DependentDetailScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const colors = isDark ? Colors.dark : Colors.light;
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
+  const [period, setPeriod] = useState<PeriodFilter>("7d");
 
   const historyQuery = useQuery<HistoryEntry[]>({
     queryKey: ["/api/dependents", id, "history"],
@@ -78,8 +81,15 @@ export default function DependentDetailScreen() {
     enabled: !!id,
   });
 
-  const history = historyQuery.data || [];
+  const allHistory = historyQuery.data || [];
   const meds = (medsQuery.data as any[]) || [];
+
+  const history = allHistory.filter((entry) => {
+    if (period === "all") return true;
+    const days = period === "7d" ? 7 : 30;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return (entry.confirmedAt || entry.timeMillis) >= cutoff;
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -89,6 +99,11 @@ export default function DependentDetailScreen() {
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
           <View style={styles.headerCenter}>
+            <View style={[styles.headerAvatar, { backgroundColor: colors.tintLight }]}>
+              <Text style={[styles.headerAvatarText, { color: colors.tint }]}>
+                {(name || "D").charAt(0).toUpperCase()}
+              </Text>
+            </View>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{name || "Dependente"}</Text>
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Histórico de doses</Text>
           </View>
@@ -100,18 +115,32 @@ export default function DependentDetailScreen() {
         <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="medkit" size={20} color={colors.tint} />
           <Text style={[styles.summaryValue, { color: colors.text }]}>{meds.length}</Text>
-          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Remédios</Text>
+          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total</Text>
         </View>
         <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="checkmark-circle" size={20} color={colors.success} />
           <Text style={[styles.summaryValue, { color: colors.success }]}>{history.filter(h => h.status === "TAKEN").length}</Text>
-          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Tomadas</Text>
+          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Tomou</Text>
         </View>
         <View style={[styles.summaryCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <Ionicons name="close-circle" size={20} color={colors.danger} />
           <Text style={[styles.summaryValue, { color: colors.danger }]}>{history.filter(h => h.status === "MISSED").length}</Text>
-          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Perdidas</Text>
+          <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Perdeu</Text>
         </View>
+      </View>
+
+      <View style={[styles.periodFilter, { backgroundColor: colors.inputBg }]}>
+        {([["7d", "7 dias"], ["30d", "30 dias"], ["all", "Todos"]] as [PeriodFilter, string][]).map(([val, label]) => (
+          <Pressable
+            key={val}
+            style={[styles.periodBtn, period === val && [styles.periodBtnActive, { backgroundColor: colors.surface }, smallShadow(colors.cardShadow)]]}
+            onPress={() => setPeriod(val)}
+          >
+            <Text style={[styles.periodBtnText, { color: period === val ? colors.tint : colors.textSecondary }, period === val && { fontFamily: "Inter_600SemiBold" }]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {historyQuery.isLoading ? (
@@ -179,14 +208,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   headerCenter: {
     alignItems: "center",
+    gap: 4,
+  },
+  headerAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerAvatarText: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
   },
   headerTitle: {
     fontSize: 18,
@@ -195,7 +236,25 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    marginTop: 1,
+  },
+  periodFilter: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginBottom: 8,
+    borderRadius: 10,
+    padding: 3,
+    gap: 3,
+  },
+  periodBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  periodBtnActive: {},
+  periodBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   summaryRow: {
     flexDirection: "row",

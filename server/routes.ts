@@ -264,6 +264,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body ?? {};
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email inválido" });
+      }
+      const user = await storage.getUserByEmail(email.trim().toLowerCase());
+      // Always respond success to avoid user enumeration
+      if (!user) return res.json({ message: "Se o email existir, um código será enviado." });
+
+      await storage.deleteExpiredPasswordResetCodes();
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await storage.createPasswordResetCode(user.id, code, expiresAt);
+
+      const resendKey = process.env.RESEND_API_KEY;
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@tomaai.app";
+      if (resendKey) {
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+          body: JSON.stringify({
+            from: fromEmail,
+            to: user.email,
+            subject: "Código para redefinir sua senha - Toma Aí",
+            html: `<p>Olá, <b>${user.name}</b>!</p><p>Use o código abaixo para redefinir sua senha. Ele expira em 1 hora.</p><h2 style="letter-spacing:8px;font-size:36px;">${code}</h2><p>Se não foi você, ignore este email.</p>`,
+          }),
+        });
+      } else {
+        console.log(`[ForgotPassword] Código para ${user.email}: ${code}`);
+      }
+
+      res.json({ message: "Se o email existir, um código será enviado." });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Erro no servidor" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { code, newPassword } = req.body ?? {};
+      if (!code || !newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+        return res.status(400).json({ message: "Código e senha (mínimo 6 caracteres) são obrigatórios" });
+      }
+      const record = await storage.getPasswordResetByCode(String(code));
+      if (!record) return res.status(400).json({ message: "Código inválido ou expirado" });
+      if (record.expiresAt < new Date()) {
+        await storage.deletePasswordResetCode(record.id);
+        return res.status(400).json({ message: "Código expirado" });
+      }
+      const hashed = await bcrypt.hash(newPassword, 10);
+      await storage.updatePassword(record.userId, hashed);
+      await storage.deletePasswordResetCode(record.id);
+      res.json({ message: "Senha redefinida com sucesso" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Erro no servidor" });
+    }
+  });
+
   // Endpoint desabilitado - upgrade deve ser feito via RevenueCat/Google Play
   app.post("/api/auth/upgrade", requireAuth, async (_req: Request, res: Response) => {
     return res.status(403).json({ message: "Upgrade deve ser realizado através da loja de aplicativos" });

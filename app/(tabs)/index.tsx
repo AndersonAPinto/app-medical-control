@@ -8,8 +8,20 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Modal,
+  ScrollView,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  FadeIn,
+  FadeOut,
+  Easing,
+} from "react-native-reanimated";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { SkeletonList } from "@/components/SkeletonCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -52,7 +64,7 @@ interface DependentSummary {
   totalMeds: number;
 }
 
-function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onConfirmDose: (med: Medication) => void; colors: typeof Colors.light }) {
+function MedicationCard({ med, onConfirmDose, colors, isOverdue, justTaken }: { med: Medication; onConfirmDose: (med: Medication) => void; colors: typeof Colors.light; isOverdue?: boolean; justTaken?: boolean }) {
   const isLowStock = med.currentStock <= med.alertThreshold;
   const isOutOfStock = med.currentStock === 0;
 
@@ -69,18 +81,57 @@ function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onCon
   const nextDoseTime = med.lastDoseAt ? med.lastDoseAt + med.intervalInHours * 3600000 : null;
   const canTakeDose = nextDoseTime ? now >= nextDoseTime - 300000 : true;
 
+  const pulseOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (isOverdue) {
+      pulseOpacity.value = withRepeat(
+        withTiming(0.45, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      );
+    } else {
+      pulseOpacity.value = 1;
+    }
+  }, [isOverdue]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+  }));
+
+  const takenScale = useSharedValue(0);
+  const takenOpacity = useSharedValue(0);
+  useEffect(() => {
+    if (justTaken) {
+      takenScale.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.back(1.5)) });
+      takenOpacity.value = withTiming(1, { duration: 200 });
+    } else {
+      takenScale.value = withTiming(0, { duration: 200 });
+      takenOpacity.value = withTiming(0, { duration: 150 });
+    }
+  }, [justTaken]);
+
+  const takenStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: takenScale.value }],
+    opacity: takenOpacity.value,
+  }));
+
   return (
     <Pressable
-      style={({ pressed }) => [styles.medCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow), pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.medCard, { backgroundColor: colors.surface }, isOverdue && { borderWidth: 1, borderColor: colors.danger + "40" }, justTaken && { borderWidth: 1, borderColor: colors.success + "60" }, cardShadow(colors.cardShadow), pressed && styles.cardPressed]}
       onPress={() => {}}
     >
       <View style={styles.medCardLeft}>
-        <View style={[styles.medIcon, { backgroundColor: colors.tintLight }, isOutOfStock && { backgroundColor: colors.dangerLight }, isLowStock && !isOutOfStock && { backgroundColor: colors.warningLight }]}>
-          <Ionicons
-            name="medical"
-            size={22}
-            color={isOutOfStock ? colors.danger : isLowStock ? colors.warning : colors.tint}
-          />
+        <View style={{ position: "relative" }}>
+          <Animated.View style={[styles.medIcon, { backgroundColor: justTaken ? colors.successLight : isOverdue ? colors.dangerLight : colors.tintLight }, isOutOfStock && !justTaken && { backgroundColor: colors.dangerLight }, isLowStock && !isOutOfStock && !isOverdue && !justTaken && { backgroundColor: colors.warningLight }, isOverdue && !justTaken && pulseStyle]}>
+            <Ionicons
+              name={justTaken ? "checkmark-circle" : isOverdue ? "alert-circle" : "medical"}
+              size={22}
+              color={justTaken ? colors.success : isOverdue ? colors.danger : isOutOfStock ? colors.danger : isLowStock ? colors.warning : colors.tint}
+            />
+          </Animated.View>
+          <Animated.View style={[{ position: "absolute", top: 0, left: 0, width: 44, height: 44, borderRadius: 13, backgroundColor: colors.success, alignItems: "center", justifyContent: "center" }, takenStyle]}>
+            <Ionicons name="checkmark" size={24} color="#fff" />
+          </Animated.View>
         </View>
         <View style={styles.medInfo}>
           <Text style={[styles.medName, { color: colors.text }]}>{med.name}</Text>
@@ -98,7 +149,12 @@ function MedicationCard({ med, onConfirmDose, colors }: { med: Medication; onCon
               {med.currentStock} un.
             </Text>
           </View>
-          {!canTakeDose && nextDoseTime && (
+          {isOverdue && (
+            <Text style={[styles.medMetaText, { color: colors.danger, marginTop: 4, fontSize: 11, fontFamily: "Inter_600SemiBold" }]}>
+              ⚠ Dose atrasada
+            </Text>
+          )}
+          {!canTakeDose && !isOverdue && nextDoseTime && (
             <Text style={[styles.medMetaText, { color: colors.warning, marginTop: 4, fontSize: 11 }]}>
               Próxima dose: {new Date(nextDoseTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
@@ -150,15 +206,21 @@ function DependentCard({ dep, index, colors, isDark }: { dep: DependentSummary; 
               <Ionicons name="checkmark-circle-outline" size={12} color={colors.success} />
               <Text style={[styles.depStatText, { color: colors.success }]}>{dep.takenToday} hoje</Text>
             </View>
-            {dep.missedToday > 0 && (
-              <>
-                <View style={[styles.metaDot, { backgroundColor: colors.textSecondary }]} />
-                <View style={styles.depStatItem}>
-                  <Ionicons name="close-circle-outline" size={12} color={colors.danger} />
-                  <Text style={[styles.depStatText, { color: colors.danger }]}>{dep.missedToday} atrasos</Text>
-                </View>
-              </>
-            )}
+          </View>
+          <View style={[
+            styles.depStatusBadge,
+            { backgroundColor: dep.missedToday > 0 ? colors.dangerLight : colors.successLight }
+          ]}>
+            <Ionicons
+              name={dep.missedToday > 0 ? "alert-circle-outline" : "checkmark-circle-outline"}
+              size={12}
+              color={dep.missedToday > 0 ? colors.danger : colors.success}
+            />
+            <Text style={[styles.depStatusText, { color: dep.missedToday > 0 ? colors.danger : colors.success }]}>
+              {dep.missedToday > 0
+                ? `${dep.missedToday} dose${dep.missedToday > 1 ? "s" : ""} atrasada${dep.missedToday > 1 ? "s" : ""}`
+                : "Em dia"}
+            </Text>
           </View>
         </View>
       </View>
@@ -177,6 +239,8 @@ export default function DashboardScreen() {
   const [activeTab, setActiveTab] = useState<"meds" | "deps">("meds");
   const [confirmMed, setConfirmMed] = useState<Medication | null>(null);
   const [showDepsLimitDialog, setShowDepsLimitDialog] = useState(false);
+  const [showQuickDoseModal, setShowQuickDoseModal] = useState(false);
+  const [lastTakenMedId, setLastTakenMedId] = useState<string | null>(null);
 
   const medsQuery = useQuery<Medication[]>({
     queryKey: ["/api/medications"],
@@ -199,7 +263,9 @@ export default function DashboardScreen() {
     },
     onSuccess: async (med: Medication) => {
       setConfirmMed(null);
-      
+      setLastTakenMedId(med.id);
+      setTimeout(() => setLastTakenMedId(null), 1800);
+
       await cancelMedicationNotifications(med.id);
       const nextDoseTime = Date.now() + med.intervalInHours * 60 * 60 * 1000;
       await scheduleNextDoseNotification(med.id, med.name, nextDoseTime);
@@ -242,13 +308,46 @@ export default function DashboardScreen() {
     router.push("/connections");
   };
 
+  const availableMeds = medications.filter((med) => {
+    const nowTs = Date.now();
+    if (!med.lastDoseAt) return true;
+    const nextDoseTime = med.lastDoseAt + med.intervalInHours * 3600000;
+    return nowTs >= nextDoseTime - 300000;
+  });
+
+  const getMedUrgency = (med: Medication): { priority: number; isOverdue: boolean } => {
+    const nowTs = Date.now();
+    if (!med.lastDoseAt) return { priority: 1, isOverdue: false }; // never taken → available
+    const nextDoseTime = med.lastDoseAt + med.intervalInHours * 3600000;
+    const isOverdue = nowTs > nextDoseTime + 300000; // 5+ min past due
+    const isAvailable = nowTs >= nextDoseTime - 300000 && !isOverdue;
+    if (isOverdue) return { priority: 0, isOverdue: true };
+    if (isAvailable) return { priority: 1, isOverdue: false };
+    return { priority: 2, isOverdue: false };
+  };
+
+  const sortedMedications = [...medications].sort((a, b) => {
+    const ua = getMedUrgency(a);
+    const ub = getMedUrgency(b);
+    if (ua.priority !== ub.priority) return ua.priority - ub.priority;
+    // within same priority, sort overdue by how long overdue (most first)
+    if (ua.isOverdue && ub.isOverdue) {
+      const nextA = a.lastDoseAt! + a.intervalInHours * 3600000;
+      const nextB = b.lastDoseAt! + b.intervalInHours * 3600000;
+      return nextA - nextB;
+    }
+    // upcoming: sort by next dose time ascending
+    if (ua.priority === 2 && ub.priority === 2) {
+      const nextA = a.lastDoseAt! + a.intervalInHours * 3600000;
+      const nextB = b.lastDoseAt! + b.intervalInHours * 3600000;
+      return nextA - nextB;
+    }
+    return 0;
+  });
+
   const renderMedsContent = () => {
     if (medsQuery.isLoading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
-        </View>
-      );
+      return <SkeletonList count={3} />;
     }
     if (medications.length === 0) {
       return (
@@ -268,11 +367,12 @@ export default function DashboardScreen() {
     }
     return (
       <FlatList
-        data={medications}
+        data={sortedMedications}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <MedicationCard med={item} onConfirmDose={handleDosePress} colors={colors} />
-        )}
+        renderItem={({ item }) => {
+          const { isOverdue } = getMedUrgency(item);
+          return <MedicationCard med={item} onConfirmDose={handleDosePress} colors={colors} isOverdue={isOverdue} justTaken={lastTakenMedId === item.id} />;
+        }}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -288,11 +388,7 @@ export default function DashboardScreen() {
 
   const renderDepsContent = () => {
     if (dependentsQuery.isLoading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
-        </View>
-      );
+      return <SkeletonList count={2} />;
     }
     if (dependents.length === 0) {
       return (
@@ -468,6 +564,61 @@ export default function DashboardScreen() {
         }}
         onCancel={() => setShowDepsLimitDialog(false)}
       />
+
+      {availableMeds.length > 0 && activeTab === "meds" && (
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.fab}>
+          <Pressable
+            style={({ pressed }) => [styles.fabBtn, { backgroundColor: colors.tint }, pressed && { opacity: 0.85, transform: [{ scale: 0.95 }] }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              if (availableMeds.length === 1) {
+                handleDosePress(availableMeds[0]);
+              } else {
+                setShowQuickDoseModal(true);
+              }
+            }}
+          >
+            <Ionicons name="checkmark" size={28} color="#fff" />
+          </Pressable>
+        </Animated.View>
+      )}
+
+      <Modal
+        visible={showQuickDoseModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowQuickDoseModal(false)}
+      >
+        <Pressable style={styles.quickDoseBackdrop} onPress={() => setShowQuickDoseModal(false)}>
+          <View style={[styles.quickDoseSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.quickDoseHandle} />
+            <Text style={[styles.quickDoseTitle, { color: colors.text }]}>Registrar Dose Rápida</Text>
+            <Text style={[styles.quickDoseSubtitle, { color: colors.textSecondary }]}>Selecione o medicamento que tomou:</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+              {availableMeds.map((med) => (
+                <Pressable
+                  key={med.id}
+                  style={({ pressed }) => [styles.quickDoseItem, { borderBottomColor: colors.border }, pressed && { backgroundColor: colors.inputBg }]}
+                  onPress={() => {
+                    setShowQuickDoseModal(false);
+                    handleDosePress(med);
+                  }}
+                >
+                  <View style={[styles.quickDoseIcon, { backgroundColor: colors.tintLight }]}>
+                    <Ionicons name="medical" size={18} color={colors.tint} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.quickDoseName, { color: colors.text }]}>{med.name}</Text>
+                    <Text style={[styles.quickDoseDosage, { color: colors.textSecondary }]}>{med.dosage}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -493,8 +644,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   bellBtn: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -611,9 +762,9 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -675,9 +826,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
   },
   confirmBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -737,6 +888,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
   },
+  depStatusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginTop: 6,
+    alignSelf: "flex-start",
+  },
+  depStatusText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
   loadingContainer: {
     flex: 1,
     alignItems: "center",
@@ -772,5 +937,75 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
+  },
+  fab: {
+    position: "absolute",
+    bottom: 100,
+    right: 20,
+  },
+  fabBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  quickDoseBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  quickDoseSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  quickDoseHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(100,116,139,0.3)",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  quickDoseTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 4,
+  },
+  quickDoseSubtitle: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 16,
+  },
+  quickDoseItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    gap: 12,
+    borderBottomWidth: 1,
+  },
+  quickDoseIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickDoseName: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+  },
+  quickDoseDosage: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 1,
   },
 });

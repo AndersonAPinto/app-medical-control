@@ -187,14 +187,12 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     textAlign: "center",
     marginBottom: 6,
-    alignSelf: "center",
   },
   message: {
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
     marginBottom: 24,
-    alignSelf: "center",
   },
   actions: {
     flexDirection: "row",
