@@ -311,6 +311,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/auth/avatar", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { avatarUrl } = req.body ?? {};
+
+      if (avatarUrl !== null && typeof avatarUrl !== "string") {
+        return res.status(400).json({ message: "avatarUrl deve ser string ou null" });
+      }
+
+      if (typeof avatarUrl === "string") {
+        const MAX_BYTES = 150 * 1024;
+        if (Buffer.byteLength(avatarUrl, "utf8") > MAX_BYTES) {
+          return res.status(413).json({ message: "Imagem muito grande. Máximo 150KB." });
+        }
+        if (!avatarUrl.startsWith("data:image/")) {
+          return res.status(400).json({ message: "Formato inválido. Use data URI de imagem." });
+        }
+      }
+
+      const updated = await storage.updateUserAvatar(req.session.userId!, avatarUrl ?? null);
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Update avatar error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.patch("/api/auth/role", requireAuth, async (req: Request, res: Response) => {
     try {
       const parsed = updateRoleSchema.safeParse(req.body);

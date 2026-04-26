@@ -22,6 +22,7 @@ interface UserProfile {
   subscriptionLastEventAt?: string | null;
   googleId?: string | null;
   linkedMasterId: string | null;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextValue {

@@ -85,6 +85,7 @@ export interface IStorage {
   registerPushToken(userId: string, token: string): Promise<PushToken>;
   getPushTokensByUser(userId: string): Promise<PushToken[]>;
   deletePushToken(token: string): Promise<void>;
+  updateUserAvatar(userId: string, avatarUrl: string | null): Promise<User>;
   updatePassword(userId: string, hashedPassword: string): Promise<void>;
   createPasswordResetCode(userId: string, code: string, expiresAt: Date): Promise<void>;
   getPasswordResetByCode(code: string): Promise<{ id: string; userId: string; expiresAt: Date } | undefined>;
@@ -262,6 +263,11 @@ export class DatabaseStorage implements IStorage {
 
   async deletePushToken(token: string): Promise<void> {
     await db.delete(pushTokens).where(eq(pushTokens.token, token));
+  }
+
+  async updateUserAvatar(userId: string, avatarUrl: string | null): Promise<User> {
+    const [updated] = await db.update(users).set({ avatarUrl }).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
   async updatePassword(userId: string, hashedPassword: string): Promise<void> {

@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   subscriptionCanceledAt: timestamp("subscription_canceled_at"),
   subscriptionLastEventAt: timestamp("subscription_last_event_at"),
   linkedMasterId: text("linked_master_id"),
+  avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
