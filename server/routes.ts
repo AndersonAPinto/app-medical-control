@@ -9,7 +9,9 @@ import {
   insertMedicationSchema,
   updateMedicationSchema,
   insertConnectionSchema,
+  googleAuthSchema,
 } from "@shared/schema";
+import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -166,6 +168,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Email already registered" });
       }
 
+      if (!parsed.data.password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
       const hashedPassword = await bcrypt.hash(parsed.data.password, 10);
       const user = await storage.createUser({
         ...parsed.data,
@@ -193,6 +199,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      if (!user.password) {
+        return res.status(401).json({ message: "Esta conta usa login com Google. Use o botão 'Entrar com Google'." });
+      }
+
       const valid = await bcrypt.compare(parsed.data.password, user.password);
       if (!valid) {
         return res.status(401).json({ message: "Invalid email or password" });
@@ -211,6 +221,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.session.destroy(() => {
       res.json({ message: "Logged out" });
     });
+  });
+
+  app.post("/api/auth/google", async (req: Request, res: Response) => {
+    try {
+      const parsed = googleAuthSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data" });
+      }
+
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+      if (!googleClientId) {
+        return res.status(500).json({ message: "Google auth not configured" });
+      }
+
+      const client = new OAuth2Client(googleClientId);
+      const ticket = await client.verifyIdToken({
+        idToken: parsed.data.idToken,
+        audience: googleClientId,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(401).json({ message: "Invalid Google token" });
+      }
+
+      const { email, sub: googleId, name, email_verified } = payload;
+      if (!email_verified) {
+        return res.status(401).json({ message: "Google email not verified" });
+      }
+
+      let user = await storage.getUserByGoogleId(googleId!);
+
+      if (!user) {
+        user = await storage.getUserByEmail(email);
+        if (user) {
+          user = await storage.updateUser(user.id, { googleId: googleId! });
+        } else {
+          const role = parsed.data.role || "MASTER";
+          user = await storage.createUser({
+            name: name || email.split("@")[0],
+            email,
+            googleId: googleId!,
+            role,
+          });
+        }
+      }
+
+      req.session.userId = user.id;
+      const { password: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Google auth error:", error);
+      res.status(500).json({ message: "Falha na autenticação com Google" });
+    }
   });
 
   app.get("/api/auth/me", async (req: Request, res: Response) => {

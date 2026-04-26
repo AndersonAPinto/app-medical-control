@@ -8,7 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:5000"
+        "EXPO_PUBLIC_API_URL": "http://localhost:5000",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "29331392425-j2mj4a7g5fgtouk4jph7s6e7nci94c7k.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -17,7 +18,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app-medical-control-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://app-medical-control-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "SEU_GOOGLE_CLIENT_ID_AQUI"
       }
     },
     "staging": {
@@ -30,8 +32,12 @@
     "production": {
       "autoIncrement": true,
       "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://app-medical-control-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://app-medical-control-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "SEU_GOOGLE_CLIENT_ID_AQUI"
       }
     }
   },

@@ -20,6 +20,7 @@ interface UserProfile {
   subscriptionExpiresAt?: string | null;
   subscriptionCanceledAt?: string | null;
   subscriptionLastEventAt?: string | null;
+  googleId?: string | null;
   linkedMasterId: string | null;
 }
 
@@ -28,6 +29,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: string) => Promise<void>;
+  loginWithGoogle: (idToken: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -93,13 +95,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data);
   };
 
+  const loginWithGoogle = async (idToken: string, role?: string) => {
+    const res = await apiRequest("POST", "/api/auth/google", { idToken, role });
+    const data = await res.json();
+    setUser(data);
+  };
+
   const logout = async () => {
     await apiRequest("POST", "/api/auth/logout");
     setUser(null);
   };
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout, refreshUser }),
+    () => ({ user, isLoading, login, register, loginWithGoogle, logout, refreshUser }),
     [user, isLoading]
   );
 

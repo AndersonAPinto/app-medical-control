@@ -9,6 +9,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -53,9 +54,14 @@ export default function LoginScreen() {
         colors={[Colors.palette.teal600, Colors.palette.teal400]}
         style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 40 }]}
       >
-        <View style={styles.iconContainer}>
+        <Image
+          source={require("@/assets/images/icon.png")}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
+        {/* <View style={styles.iconContainer}>
           <Ionicons name="medical" size={40} color="#fff" />
-        </View>
+        </View> */}
         <Text style={styles.brandTitle}>Toma Aí</Text>
         <Text style={styles.brandSubtitle}>Controle de medicamentos</Text>
       </LinearGradient>
@@ -116,12 +122,6 @@ export default function LoginScreen() {
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </Pressable>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>ou</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <Pressable
             style={({ pressed }) => [styles.registerBtn, pressed && styles.registerBtnPressed]}
             onPress={() => router.push("/register")}
@@ -158,6 +158,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+    borderRadius: 20,
   },
   iconContainer: {
     width: 72,
@@ -244,22 +250,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: Colors.light.tint,
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.light.border,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
   },
   registerBtn: {
     borderRadius: 14,
