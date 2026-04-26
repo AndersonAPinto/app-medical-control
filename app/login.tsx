@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,20 +17,42 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { useGoogleAuth } from "@/lib/google-auth";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const { request, response: googleResponse, promptAsync } = useGoogleAuth();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
 
   const showError = (message: string) => {
     setDialog({ title: "Não foi possível entrar", message });
   };
+
+  useEffect(() => {
+    if (googleResponse?.type === "error") {
+      showError(googleResponse.error?.message || "Erro ao entrar com Google");
+      return;
+    }
+    if (googleResponse?.type !== "success") return;
+
+    const idToken = googleResponse.params?.id_token;
+    if (!idToken) {
+      showError("Token Google não encontrado");
+      return;
+    }
+    setGoogleLoading(true);
+    loginWithGoogle(idToken)
+      .then(() => router.replace("/(tabs)"))
+      .catch((err: any) => showError(err.message || "Falha ao entrar com Google"))
+      .finally(() => setGoogleLoading(false));
+  }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -127,6 +149,31 @@ export default function LoginScreen() {
             onPress={() => router.push("/register")}
           >
             <Text style={styles.registerBtnText}>Criar conta</Text>
+          </Pressable>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.googleBtn,
+              pressed && styles.btnPressed,
+              (googleLoading || !request) && styles.btnDisabled,
+            ]}
+            onPress={() => promptAsync()}
+            disabled={googleLoading || !request}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color={Colors.light.text} />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#DB4437" />
+                <Text style={styles.googleBtnText}>Entrar com Google</Text>
+              </>
+            )}
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -266,5 +313,37 @@ const styles = StyleSheet.create({
     color: Colors.light.tint,
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
+  },
+  divider: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.light.border,
+  },
+  dividerText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+    marginHorizontal: 12,
+  },
+  googleBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: Colors.light.surface,
+    borderRadius: 14,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: Colors.light.border,
+    gap: 10,
+  },
+  googleBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.text,
   },
 });
