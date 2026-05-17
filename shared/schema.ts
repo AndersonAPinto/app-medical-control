@@ -100,6 +100,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   password: true,
   googleId: true,
+  avatarUrl: true,
   role: true,
 }).extend({
   password: z.string().min(6).optional(),

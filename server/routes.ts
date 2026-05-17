@@ -253,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid Google token" });
       }
 
-      const { email, sub: googleId, name, email_verified } = payload;
+      const { email, sub: googleId, name, picture, email_verified } = payload;
       if (!email_verified) {
         return res.status(401).json({ message: "Google email not verified" });
       }
@@ -263,13 +263,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         user = await storage.getUserByEmail(email);
         if (user) {
-          user = await storage.updateUser(user.id, { googleId: googleId! });
+          const patch: { googleId: string; avatarUrl?: string } = { googleId: googleId! };
+          if (!user.avatarUrl && picture) patch.avatarUrl = picture;
+          user = await storage.updateUser(user.id, patch);
         } else {
           const role = parsed.data.role || "MASTER";
           user = await storage.createUser({
             name: name || email.split("@")[0],
             email,
             googleId: googleId!,
+            avatarUrl: picture ?? null,
             role,
           });
         }
