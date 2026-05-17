@@ -9,7 +9,8 @@ export const users = pgTable("users", {
     .default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
+  googleId: text("google_id").unique(),
   role: text("role").notNull().default("MASTER"),
   planType: text("plan_type").notNull().default("FREE"),
   subscriptionStatus: text("subscription_status").notNull().default("INACTIVE"),
@@ -24,6 +25,7 @@ export const users = pgTable("users", {
   subscriptionCanceledAt: timestamp("subscription_canceled_at"),
   subscriptionLastEventAt: timestamp("subscription_last_event_at"),
   linkedMasterId: text("linked_master_id"),
+  avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -97,7 +99,15 @@ export const insertUserSchema = createInsertSchema(users).pick({
   name: true,
   email: true,
   password: true,
+  googleId: true,
   role: true,
+}).extend({
+  password: z.string().min(6).optional(),
+});
+
+export const googleAuthSchema = z.object({
+  idToken: z.string().min(1),
+  role: z.enum(["MASTER", "DEPENDENT", "CONTROLLER"]).optional(),
 });
 
 export const loginSchema = z.object({

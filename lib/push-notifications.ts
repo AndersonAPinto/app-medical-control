@@ -1,14 +1,23 @@
 import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
 
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-    }),
-});
+// expo-notifications is not supported in Expo Go on SDK 53+
+// Only load when running in a development build or production
+const isExpoGo = Constants.executionEnvironment === "storeClient";
+
+let Notifications: typeof import("expo-notifications") | null = null;
+
+if (!isExpoGo) {
+    Notifications = require("expo-notifications");
+
+    Notifications!.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+        }),
+    });
+}
 
 function getProjectId(): string | undefined {
     return (
@@ -19,6 +28,8 @@ function getProjectId(): string | undefined {
 }
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+    if (!Notifications) return null;
+
     try {
         const settings = await Notifications.getPermissionsAsync();
         let finalStatus = settings.status;
@@ -55,6 +66,8 @@ export async function scheduleNextDoseNotification(
     medicationName: string,
     triggerTimeMillis: number
 ): Promise<string | null> {
+    if (!Notifications) return null;
+
     try {
         const settings = await Notifications.getPermissionsAsync();
         if (settings.status !== "granted") {
@@ -63,7 +76,6 @@ export async function scheduleNextDoseNotification(
 
         const date = new Date(triggerTimeMillis);
 
-        // Schedule only if the date is in the future
         if (date.getTime() <= Date.now()) {
             return null;
         }
@@ -76,9 +88,9 @@ export async function scheduleNextDoseNotification(
                 sound: true,
                 priority: Notifications.AndroidNotificationPriority.MAX,
             },
-            trigger: date,
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
         });
-        
+
         return identifier;
     } catch (error) {
         console.error("Failed to schedule local notification:", error);
@@ -87,6 +99,8 @@ export async function scheduleNextDoseNotification(
 }
 
 export async function cancelMedicationNotifications(medicationId: string): Promise<void> {
+    if (!Notifications) return;
+
     try {
         const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
         const toCancel = scheduledNotifications.filter(

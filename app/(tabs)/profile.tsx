@@ -20,6 +20,7 @@ import { useTheme } from "@/lib/theme-context";
 import { apiRequest } from "@/lib/query-client";
 import { cardShadow } from "@/lib/shadows";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import AvatarPicker from "@/components/AvatarPicker";
 
 const ROLES = [
   { key: "MASTER", label: "Responsavel", icon: "shield-checkmark" },
@@ -170,11 +171,11 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 100 }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.profileCard, { backgroundColor: colors.surface }, cardShadow(colors.cardShadow)]}>
           <View style={styles.avatarContainer}>
-            <View style={[styles.avatar, { backgroundColor: colors.tint }]}>
-              <Text style={styles.avatarText}>
-                {user?.name?.charAt(0)?.toUpperCase() || "U"}
-              </Text>
-            </View>
+            <AvatarPicker
+              avatarUrl={user?.avatarUrl}
+              name={user?.name}
+              onUpload={refreshUser}
+            />
           </View>
           <Text style={[styles.profileName, { color: colors.text }]}>{user?.name}</Text>
           <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{user?.email}</Text>
@@ -422,18 +423,6 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 12,
-  },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    color: "#fff",
   },
   profileName: {
     fontSize: 20,

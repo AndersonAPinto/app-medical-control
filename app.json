@@ -15,7 +15,11 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.medcontrol.app"
+      "bundleIdentifier": "com.medcontrol.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Para adicionar sua foto de perfil",
+        "NSCameraUsageDescription": "Para tirar uma foto de perfil"
+      }
     },
     "android": {
       "package": "com.medcontrol.app",
@@ -27,11 +31,22 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
-        "INTERNET",
-        "VIBRATE",
-        "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
-        "com.android.vending.BILLING"
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "com.android.vending.BILLING",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "com.android.vending.BILLING",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -41,6 +56,13 @@
       "expo-router",
       "expo-font",
       "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Para adicionar sua foto de perfil",
+          "cameraPermission": "Para tirar uma foto de perfil"
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -58,6 +80,12 @@
         "projectId": "00914869-9db2-457e-a6cc-a89378038579"
       }
     },
-    "owner": "andersonpinto"
+    "owner": "andersonpinto",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/00914869-9db2-457e-a6cc-a89378038579"
+    }
   }
 }

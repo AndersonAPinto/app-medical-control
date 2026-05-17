@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,20 +17,59 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { useGoogleAuth } from "@/lib/google-auth";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const { request, response: googleResponse, promptAsync, idToken } = useGoogleAuth();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
 
   const showError = (message: string) => {
     setDialog({ title: "Não foi possível entrar", message });
   };
+
+  useEffect(() => {
+    if (!googleResponse) return;
+
+    if (googleResponse.type === "dismiss" || googleResponse.type === "cancel") {
+      // User closed the browser intentionally — do nothing
+      return;
+    }
+
+    if (googleResponse.type === "error") {
+      const msg = googleResponse.error?.message ?? "Erro ao entrar com Google";
+      console.warn("[GoogleAuth] error response:", googleResponse.error);
+      showError(msg);
+      return;
+    }
+
+    if (googleResponse.type !== "success") return;
+
+    // id_token is available after:
+    //   • web  → IdToken implicit flow → params.id_token
+    //   • native → Code+PKCE auto-exchange → authentication.idToken (also mirrored to params.id_token by the library)
+    if (!idToken) {
+      console.warn("[GoogleAuth] success response but no id_token found:", googleResponse);
+      showError("Token Google não encontrado. Tente novamente.");
+      return;
+    }
+
+    setGoogleLoading(true);
+    loginWithGoogle(idToken)
+      .then(() => router.replace("/(tabs)"))
+      .catch((err: any) => {
+        console.error("[GoogleAuth] backend validation failed:", err);
+        showError(err.message || "Falha ao entrar com Google");
+      })
+      .finally(() => setGoogleLoading(false));
+  }, [googleResponse, idToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -53,9 +93,14 @@ export default function LoginScreen() {
         colors={[Colors.palette.teal600, Colors.palette.teal400]}
         style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 40 }]}
       >
-        <View style={styles.iconContainer}>
+        <Image
+          source={require("@/assets/images/icon.png")}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
+        {/* <View style={styles.iconContainer}>
           <Ionicons name="medical" size={40} color="#fff" />
-        </View>
+        </View> */}
         <Text style={styles.brandTitle}>Toma Aí</Text>
         <Text style={styles.brandSubtitle}>Controle de medicamentos</Text>
       </LinearGradient>
@@ -116,6 +161,13 @@ export default function LoginScreen() {
             <Text style={styles.forgotText}>Esqueci minha senha</Text>
           </Pressable>
 
+          <Pressable
+            style={({ pressed }) => [styles.registerBtn, pressed && styles.registerBtnPressed]}
+            onPress={() => router.push("/register")}
+          >
+            <Text style={styles.registerBtnText}>Criar conta</Text>
+          </Pressable>
+
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>ou</Text>
@@ -123,10 +175,22 @@ export default function LoginScreen() {
           </View>
 
           <Pressable
-            style={({ pressed }) => [styles.registerBtn, pressed && styles.registerBtnPressed]}
-            onPress={() => router.push("/register")}
+            style={({ pressed }) => [
+              styles.googleBtn,
+              pressed && styles.btnPressed,
+              (googleLoading || !request) && styles.btnDisabled,
+            ]}
+            onPress={() => promptAsync()}
+            disabled={googleLoading || !request}
           >
-            <Text style={styles.registerBtnText}>Criar conta</Text>
+            {googleLoading ? (
+              <ActivityIndicator color={Colors.light.text} />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#DB4437" />
+                <Text style={styles.googleBtnText}>Entrar com Google</Text>
+              </>
+            )}
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -158,6 +222,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+    borderRadius: 20,
   },
   iconContainer: {
     width: 72,
@@ -245,22 +315,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.light.tint,
   },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.light.border,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-  },
   registerBtn: {
     borderRadius: 14,
     height: 52,
@@ -276,5 +330,37 @@ const styles = StyleSheet.create({
     color: Colors.light.tint,
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
+  },
+  divider: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.light.border,
+  },
+  dividerText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+    marginHorizontal: 12,
+  },
+  googleBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: Colors.light.surface,
+    borderRadius: 14,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: Colors.light.border,
+    gap: 10,
+  },
+  googleBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.text,
   },
 });

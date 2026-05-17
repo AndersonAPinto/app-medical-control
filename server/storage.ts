@@ -30,9 +30,10 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool);
 
 export interface IStorage {
-  createUser(user: InsertUser & { password: string }): Promise<User>;
+  createUser(user: InsertUser & { password?: string; googleId?: string }): Promise<User>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
   updateUser(
     id: string,
     data: Partial<
@@ -53,6 +54,7 @@ export interface IStorage {
         | "subscriptionExpiresAt"
         | "subscriptionCanceledAt"
         | "subscriptionLastEventAt"
+        | "googleId"
       >
     >
   ): Promise<User>;
@@ -83,6 +85,7 @@ export interface IStorage {
   registerPushToken(userId: string, token: string): Promise<PushToken>;
   getPushTokensByUser(userId: string): Promise<PushToken[]>;
   deletePushToken(token: string): Promise<void>;
+  updateUserAvatar(userId: string, avatarUrl: string | null): Promise<User>;
   updatePassword(userId: string, hashedPassword: string): Promise<void>;
   createPasswordResetCode(userId: string, code: string, expiresAt: Date): Promise<void>;
   getPasswordResetByCode(code: string): Promise<{ id: string; userId: string; expiresAt: Date } | undefined>;
@@ -91,7 +94,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async createUser(user: InsertUser & { password: string }): Promise<User> {
+  async createUser(user: InsertUser & { password?: string; googleId?: string }): Promise<User> {
     const [created] = await db.insert(users).values(user).returning();
     return created;
   }
@@ -103,6 +106,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserById(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
     return user;
   }
 
@@ -126,6 +134,7 @@ export class DatabaseStorage implements IStorage {
         | "subscriptionExpiresAt"
         | "subscriptionCanceledAt"
         | "subscriptionLastEventAt"
+        | "googleId"
       >
     >
   ): Promise<User> {
@@ -254,6 +263,11 @@ export class DatabaseStorage implements IStorage {
 
   async deletePushToken(token: string): Promise<void> {
     await db.delete(pushTokens).where(eq(pushTokens.token, token));
+  }
+
+  async updateUserAvatar(userId: string, avatarUrl: string | null): Promise<User> {
+    const [updated] = await db.update(users).set({ avatarUrl }).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
   async updatePassword(userId: string, hashedPassword: string): Promise<void> {

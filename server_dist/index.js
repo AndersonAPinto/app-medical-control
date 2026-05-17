@@ -1,5 +1,7 @@
 // server/index.ts
+import "dotenv/config";
 import express from "express";
+import helmet from "helmet";
 
 // server/routes.ts
 import { createServer } from "node:http";
@@ -13,7 +15,8 @@ var users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
+  googleId: text("google_id").unique(),
   role: text("role").notNull().default("MASTER"),
   planType: text("plan_type").notNull().default("FREE"),
   subscriptionStatus: text("subscription_status").notNull().default("INACTIVE"),
@@ -28,6 +31,7 @@ var users = pgTable("users", {
   subscriptionCanceledAt: timestamp("subscription_canceled_at"),
   subscriptionLastEventAt: timestamp("subscription_last_event_at"),
   linkedMasterId: text("linked_master_id"),
+  avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow()
 });
 var medications = pgTable("medications", {
@@ -71,11 +75,25 @@ var pushTokens = pgTable("push_tokens", {
   token: text("token").notNull(),
   createdAt: timestamp("created_at").defaultNow()
 });
+var passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull(),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+});
 var insertUserSchema = createInsertSchema(users).pick({
   name: true,
   email: true,
   password: true,
+  googleId: true,
   role: true
+}).extend({
+  password: z.string().min(6).optional()
+});
+var googleAuthSchema = z.object({
+  idToken: z.string().min(1),
+  role: z.enum(["MASTER", "DEPENDENT", "CONTROLLER"]).optional()
 });
 var loginSchema = z.object({
   email: z.string().email(),
@@ -128,6 +146,10 @@ var DatabaseStorage = class {
   }
   async getUserById(id) {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+  async getUserByGoogleId(googleId) {
+    const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
     return user;
   }
   async updateUser(id, data) {
@@ -228,6 +250,28 @@ var DatabaseStorage = class {
   async deletePushToken(token) {
     await db.delete(pushTokens).where(eq(pushTokens.token, token));
   }
+  async updateUserAvatar(userId, avatarUrl) {
+    const [updated] = await db.update(users).set({ avatarUrl }).where(eq(users.id, userId)).returning();
+    return updated;
+  }
+  async updatePassword(userId, hashedPassword) {
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+  }
+  async createPasswordResetCode(userId, code, expiresAt) {
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    await db.insert(passwordResetTokens).values({ userId, code, expiresAt });
+  }
+  async getPasswordResetByCode(code) {
+    const [row] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.code, code));
+    if (!row) return void 0;
+    return { id: row.id, userId: row.userId, expiresAt: row.expiresAt };
+  }
+  async deletePasswordResetCode(id) {
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, id));
+  }
+  async deleteExpiredPasswordResetCodes() {
+    await db.delete(passwordResetTokens).where(sql2`expires_at < now()`);
+  }
   async getDependentsForMaster(masterId) {
     const conns = await this.getConnectionsByMaster(masterId);
     const acceptedConns = conns.filter((c) => c.status === "ACCEPTED");
@@ -246,6 +290,7 @@ var DatabaseStorage = class {
 var storage = new DatabaseStorage();
 
 // server/routes.ts
+import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -368,8 +413,11 @@ function resolvePlanTypeFromSubscription(isActiveNow, expiresAt) {
 }
 async function registerRoutes(app2) {
   const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction && !process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET must be set in production");
+  if (!process.env.SESSION_SECRET) {
+    if (isProduction) {
+      throw new Error("SESSION_SECRET must be set in production");
+    }
+    console.warn("WARNING: SESSION_SECRET not set. Using insecure default for development only.");
   }
   if (isProduction) {
     app2.set("trust proxy", 1);
@@ -404,6 +452,9 @@ async function registerRoutes(app2) {
       if (existing) {
         return res.status(409).json({ message: "Email already registered" });
       }
+      if (!parsed.data.password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
       const hashedPassword = await bcrypt.hash(parsed.data.password, 10);
       const user = await storage.createUser({
         ...parsed.data,
@@ -427,6 +478,9 @@ async function registerRoutes(app2) {
       if (!user) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
+      if (!user.password) {
+        return res.status(401).json({ message: "Esta conta usa login com Google. Use o bot\xE3o 'Entrar com Google'." });
+      }
       const valid = await bcrypt.compare(parsed.data.password, user.password);
       if (!valid) {
         return res.status(401).json({ message: "Invalid email or password" });
@@ -443,6 +497,52 @@ async function registerRoutes(app2) {
     req.session.destroy(() => {
       res.json({ message: "Logged out" });
     });
+  });
+  app2.post("/api/auth/google", async (req, res) => {
+    try {
+      const parsed = googleAuthSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data" });
+      }
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+      if (!googleClientId) {
+        return res.status(500).json({ message: "Google auth not configured" });
+      }
+      const client = new OAuth2Client(googleClientId);
+      const ticket = await client.verifyIdToken({
+        idToken: parsed.data.idToken,
+        audience: googleClientId
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(401).json({ message: "Invalid Google token" });
+      }
+      const { email, sub: googleId, name, email_verified } = payload;
+      if (!email_verified) {
+        return res.status(401).json({ message: "Google email not verified" });
+      }
+      let user = await storage.getUserByGoogleId(googleId);
+      if (!user) {
+        user = await storage.getUserByEmail(email);
+        if (user) {
+          user = await storage.updateUser(user.id, { googleId });
+        } else {
+          const role = parsed.data.role || "MASTER";
+          user = await storage.createUser({
+            name: name || email.split("@")[0],
+            email,
+            googleId,
+            role
+          });
+        }
+      }
+      req.session.userId = user.id;
+      const { password: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Google auth error:", error);
+      res.status(500).json({ message: "Falha na autentica\xE7\xE3o com Google" });
+    }
   });
   app2.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) {
@@ -475,6 +575,29 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Server error" });
     }
   });
+  app2.patch("/api/auth/avatar", requireAuth, async (req, res) => {
+    try {
+      const { avatarUrl } = req.body ?? {};
+      if (avatarUrl !== null && typeof avatarUrl !== "string") {
+        return res.status(400).json({ message: "avatarUrl deve ser string ou null" });
+      }
+      if (typeof avatarUrl === "string") {
+        const MAX_BYTES = 150 * 1024;
+        if (Buffer.byteLength(avatarUrl, "utf8") > MAX_BYTES) {
+          return res.status(413).json({ message: "Imagem muito grande. M\xE1ximo 150KB." });
+        }
+        if (!avatarUrl.startsWith("data:image/")) {
+          return res.status(400).json({ message: "Formato inv\xE1lido. Use data URI de imagem." });
+        }
+      }
+      const updated = await storage.updateUserAvatar(req.session.userId, avatarUrl ?? null);
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Update avatar error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
   app2.patch("/api/auth/role", requireAuth, async (req, res) => {
     try {
       const parsed = updateRoleSchema.safeParse(req.body);
@@ -489,21 +612,63 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Server error" });
     }
   });
-  app2.post("/api/auth/upgrade", requireAuth, async (req, res) => {
+  app2.post("/api/auth/forgot-password", async (req, res) => {
     try {
-      const now = /* @__PURE__ */ new Date();
-      const updated = await storage.updateUser(req.session.userId, {
-        planType: "PREMIUM",
-        subscriptionStatus: "ACTIVE",
-        subscriptionWillRenew: true,
-        subscriptionStartedAt: now
-      });
-      const { password: _, ...safeUser } = updated;
-      res.json(safeUser);
+      const { email } = req.body ?? {};
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email inv\xE1lido" });
+      }
+      const user = await storage.getUserByEmail(email.trim().toLowerCase());
+      if (!user) return res.json({ message: "Se o email existir, um c\xF3digo ser\xE1 enviado." });
+      await storage.deleteExpiredPasswordResetCodes();
+      const code = String(Math.floor(1e5 + Math.random() * 9e5));
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
+      await storage.createPasswordResetCode(user.id, code, expiresAt);
+      const resendKey = process.env.RESEND_API_KEY;
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@tomaai.app";
+      if (resendKey) {
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
+          body: JSON.stringify({
+            from: fromEmail,
+            to: user.email,
+            subject: "C\xF3digo para redefinir sua senha - Toma A\xED",
+            html: `<p>Ol\xE1, <b>${user.name}</b>!</p><p>Use o c\xF3digo abaixo para redefinir sua senha. Ele expira em 1 hora.</p><h2 style="letter-spacing:8px;font-size:36px;">${code}</h2><p>Se n\xE3o foi voc\xEA, ignore este email.</p>`
+          })
+        });
+      } else {
+        console.log(`[ForgotPassword] C\xF3digo para ${user.email}: ${code}`);
+      }
+      res.json({ message: "Se o email existir, um c\xF3digo ser\xE1 enviado." });
     } catch (error) {
-      console.error("Upgrade error:", error);
-      res.status(500).json({ message: "Server error" });
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Erro no servidor" });
     }
+  });
+  app2.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { code, newPassword } = req.body ?? {};
+      if (!code || !newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+        return res.status(400).json({ message: "C\xF3digo e senha (m\xEDnimo 6 caracteres) s\xE3o obrigat\xF3rios" });
+      }
+      const record = await storage.getPasswordResetByCode(String(code));
+      if (!record) return res.status(400).json({ message: "C\xF3digo inv\xE1lido ou expirado" });
+      if (record.expiresAt < /* @__PURE__ */ new Date()) {
+        await storage.deletePasswordResetCode(record.id);
+        return res.status(400).json({ message: "C\xF3digo expirado" });
+      }
+      const hashed = await bcrypt.hash(newPassword, 10);
+      await storage.updatePassword(record.userId, hashed);
+      await storage.deletePasswordResetCode(record.id);
+      res.json({ message: "Senha redefinida com sucesso" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Erro no servidor" });
+    }
+  });
+  app2.post("/api/auth/upgrade", requireAuth, async (_req, res) => {
+    return res.status(403).json({ message: "Upgrade deve ser realizado atrav\xE9s da loja de aplicativos" });
   });
   app2.post("/api/auth/sync-plan", requireAuth, async (req, res) => {
     try {
@@ -570,7 +735,10 @@ async function registerRoutes(app2) {
       const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
       const authHeader = req.header("authorization") || "";
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim();
-      if (webhookSecret && token !== webhookSecret) {
+      if (!webhookSecret) {
+        return res.status(503).json({ message: "Webhook not configured" });
+      }
+      if (token !== webhookSecret) {
         return res.status(401).json({ message: "Invalid webhook token" });
       }
       const event = req.body?.event;
@@ -668,7 +836,16 @@ async function registerRoutes(app2) {
   app2.get("/api/medications", requireAuth, async (req, res) => {
     try {
       const meds = await storage.getMedicationsByOwner(req.session.userId);
-      res.json(meds);
+      const schedules = await storage.getConfirmedSchedulesByOwner(req.session.userId);
+      const enrichedMeds = meds.map((med) => {
+        const medSchedules = schedules.filter((s) => s.medId === med.id);
+        const lastSchedule = medSchedules.length > 0 ? medSchedules[0] : null;
+        return {
+          ...med,
+          lastDoseAt: lastSchedule ? lastSchedule.timeMillis : null
+        };
+      });
+      res.json(enrichedMeds);
     } catch (error) {
       console.error("Get medications error:", error);
       res.status(500).json({ message: "Server error" });
@@ -679,6 +856,9 @@ async function registerRoutes(app2) {
       const med = await storage.getMedicationById(req.params.id);
       if (!med) {
         return res.status(404).json({ message: "Medication not found" });
+      }
+      if (med.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Acesso negado" });
       }
       res.json(med);
     } catch (error) {
@@ -749,6 +929,13 @@ async function registerRoutes(app2) {
       const { currentStock } = req.body;
       if (typeof currentStock !== "number" || currentStock < 0) {
         return res.status(400).json({ message: "Invalid stock value" });
+      }
+      const med = await storage.getMedicationById(req.params.id);
+      if (!med) {
+        return res.status(404).json({ message: "Medication not found" });
+      }
+      if (med.ownerId !== req.session.userId) {
+        return res.status(403).json({ message: "Acesso negado" });
       }
       await storage.updateMedicationStock(req.params.id, currentStock);
       res.json({ message: "Stock updated" });
@@ -828,6 +1015,16 @@ async function registerRoutes(app2) {
       }
       if (med.ownerId !== userId) {
         return res.status(403).json({ message: "Not your medication" });
+      }
+      const schedules = await storage.getConfirmedSchedulesByOwner(userId);
+      const medSchedules = schedules.filter((s) => s.medId === medId);
+      const lastSchedule = medSchedules.length > 0 ? medSchedules[0] : null;
+      if (lastSchedule) {
+        const nextDoseTime = lastSchedule.timeMillis + med.intervalInHours * 60 * 60 * 1e3;
+        const canTakeDose = now >= nextDoseTime - 5 * 60 * 1e3;
+        if (!canTakeDose) {
+          return res.status(400).json({ message: "Too early to take this dose" });
+        }
       }
       const schedule = await storage.createSchedule({
         medId,
@@ -988,6 +1185,13 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/connections/:id", requireAuth, async (req, res) => {
     try {
+      const connsByMaster = await storage.getConnectionsByMaster(req.session.userId);
+      const connsByDep = await storage.getConnectionsByDependent(req.session.userId);
+      const allConns = [...connsByMaster, ...connsByDep];
+      const conn = allConns.find((c) => c.id === req.params.id);
+      if (!conn) {
+        return res.status(403).json({ message: "Voc\xEA n\xE3o tem permiss\xE3o para remover esta conex\xE3o" });
+      }
       await storage.deleteConnection(req.params.id);
       res.json({ message: "Connection removed" });
     } catch (error) {
@@ -997,10 +1201,13 @@ async function registerRoutes(app2) {
   });
   app2.patch("/api/connections/:id/accept", requireAuth, async (req, res) => {
     try {
+      const conns = await storage.getConnectionsByDependent(req.session.userId);
+      const conn = conns.find((c) => c.id === req.params.id);
+      if (!conn) {
+        return res.status(403).json({ message: "Voc\xEA n\xE3o tem permiss\xE3o para aceitar esta conex\xE3o" });
+      }
       await storage.acceptConnection(req.params.id);
       try {
-        const conns = await storage.getConnectionsByDependent(req.session.userId);
-        const conn = conns.find((c) => c.id === req.params.id);
         if (conn) {
           const dependent = await storage.getUserById(conn.dependentId);
           if (dependent) {
@@ -1024,8 +1231,24 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/dependents/:id/medications", requireAuth, async (req, res) => {
     try {
+      const masterConns = await storage.getConnectionsByMaster(req.session.userId);
+      const hasAccess = masterConns.some(
+        (c) => c.dependentId === req.params.id && c.status === "ACCEPTED"
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Voc\xEA n\xE3o tem acesso aos medicamentos deste dependente" });
+      }
       const meds = await storage.getMedicationsByOwner(req.params.id);
-      res.json(meds);
+      const schedules = await storage.getConfirmedSchedulesByOwner(req.params.id);
+      const enrichedMeds = meds.map((med) => {
+        const medSchedules = schedules.filter((s) => s.medId === med.id);
+        const lastSchedule = medSchedules.length > 0 ? medSchedules[0] : null;
+        return {
+          ...med,
+          lastDoseAt: lastSchedule ? lastSchedule.timeMillis : null
+        };
+      });
+      res.json(enrichedMeds);
     } catch (error) {
       console.error("Get dependent medications error:", error);
       res.status(500).json({ message: "Server error" });
@@ -1248,6 +1471,7 @@ import * as fs from "fs";
 import * as path from "path";
 var app = express();
 var log = console.log;
+app.use(helmet());
 function setupCors(app2) {
   const allowedOrigins = /* @__PURE__ */ new Set();
   const appAllowedOrigins = process.env.APP_ALLOWED_ORIGINS;

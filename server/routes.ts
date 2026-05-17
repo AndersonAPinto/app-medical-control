@@ -9,7 +9,9 @@ import {
   insertMedicationSchema,
   updateMedicationSchema,
   insertConnectionSchema,
+  googleAuthSchema,
 } from "@shared/schema";
+import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -166,6 +168,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Email already registered" });
       }
 
+      if (!parsed.data.password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
       const hashedPassword = await bcrypt.hash(parsed.data.password, 10);
       const user = await storage.createUser({
         ...parsed.data,
@@ -193,6 +199,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      if (!user.password) {
+        return res.status(401).json({ message: "Esta conta usa login com Google. Use o botão 'Entrar com Google'." });
+      }
+
       const valid = await bcrypt.compare(parsed.data.password, user.password);
       if (!valid) {
         return res.status(401).json({ message: "Invalid email or password" });
@@ -211,6 +221,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.session.destroy(() => {
       res.json({ message: "Logged out" });
     });
+  });
+
+  app.post("/api/auth/google", async (req: Request, res: Response) => {
+    try {
+      const parsed = googleAuthSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data" });
+      }
+
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+      if (!googleClientId) {
+        return res.status(500).json({ message: "Google auth not configured" });
+      }
+
+      const validAudiences = [googleClientId];
+      if (process.env.GOOGLE_ANDROID_CLIENT_ID) {
+        validAudiences.push(process.env.GOOGLE_ANDROID_CLIENT_ID);
+      }
+      if (process.env.GOOGLE_IOS_CLIENT_ID) {
+        validAudiences.push(process.env.GOOGLE_IOS_CLIENT_ID);
+      }
+
+      const client = new OAuth2Client();
+      const ticket = await client.verifyIdToken({
+        idToken: parsed.data.idToken,
+        audience: validAudiences,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(401).json({ message: "Invalid Google token" });
+      }
+
+      const { email, sub: googleId, name, email_verified } = payload;
+      if (!email_verified) {
+        return res.status(401).json({ message: "Google email not verified" });
+      }
+
+      let user = await storage.getUserByGoogleId(googleId!);
+
+      if (!user) {
+        user = await storage.getUserByEmail(email);
+        if (user) {
+          user = await storage.updateUser(user.id, { googleId: googleId! });
+        } else {
+          const role = parsed.data.role || "MASTER";
+          user = await storage.createUser({
+            name: name || email.split("@")[0],
+            email,
+            googleId: googleId!,
+            role,
+          });
+        }
+      }
+
+      req.session.userId = user.id;
+      const { password: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Google auth error:", error);
+      res.status(500).json({ message: "Falha na autenticação com Google" });
+    }
   });
 
   app.get("/api/auth/me", async (req: Request, res: Response) => {
@@ -244,6 +315,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(safeUser);
     } catch (error) {
       console.error("Update profile error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/auth/avatar", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { avatarUrl } = req.body ?? {};
+
+      if (avatarUrl !== null && typeof avatarUrl !== "string") {
+        return res.status(400).json({ message: "avatarUrl deve ser string ou null" });
+      }
+
+      if (typeof avatarUrl === "string") {
+        const MAX_BYTES = 150 * 1024;
+        if (Buffer.byteLength(avatarUrl, "utf8") > MAX_BYTES) {
+          return res.status(413).json({ message: "Imagem muito grande. Máximo 150KB." });
+        }
+        if (!avatarUrl.startsWith("data:image/")) {
+          return res.status(400).json({ message: "Formato inválido. Use data URI de imagem." });
+        }
+      }
+
+      const updated = await storage.updateUserAvatar(req.session.userId!, avatarUrl ?? null);
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Update avatar error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
