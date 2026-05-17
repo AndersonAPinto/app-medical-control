@@ -87,6 +87,7 @@ var insertUserSchema = createInsertSchema(users).pick({
   email: true,
   password: true,
   googleId: true,
+  avatarUrl: true,
   role: true
 }).extend({
   password: z.string().min(6).optional()
@@ -536,7 +537,7 @@ async function registerRoutes(app2) {
       if (!payload || !payload.email) {
         return res.status(401).json({ message: "Invalid Google token" });
       }
-      const { email, sub: googleId, name, email_verified } = payload;
+      const { email, sub: googleId, name, picture, email_verified } = payload;
       if (!email_verified) {
         return res.status(401).json({ message: "Google email not verified" });
       }
@@ -544,13 +545,17 @@ async function registerRoutes(app2) {
       if (!user) {
         user = await storage.getUserByEmail(email);
         if (user) {
-          user = await storage.updateUser(user.id, { googleId });
+          const patch = { googleId };
+          if (!user.avatarUrl && picture)
+            patch.avatarUrl = picture;
+          user = await storage.updateUser(user.id, patch);
         } else {
           const role = parsed.data.role || "MASTER";
           user = await storage.createUser({
             name: name || email.split("@")[0],
             email,
             googleId,
+            avatarUrl: picture ?? null,
             role
           });
         }
