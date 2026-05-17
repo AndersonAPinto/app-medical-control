@@ -31,13 +31,22 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
-        "INTERNET",
-        "VIBRATE",
-        "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
         "com.android.vending.BILLING",
-        "READ_MEDIA_IMAGES",
-        "CAMERA"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "com.android.vending.BILLING",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -71,6 +80,12 @@
         "projectId": "00914869-9db2-457e-a6cc-a89378038579"
       }
     },
-    "owner": "andersonpinto"
+    "owner": "andersonpinto",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/00914869-9db2-457e-a6cc-a89378038579"
+    }
   }
 }

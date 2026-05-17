@@ -235,10 +235,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Google auth not configured" });
       }
 
-      const client = new OAuth2Client(googleClientId);
+      const validAudiences = [googleClientId];
+      if (process.env.GOOGLE_ANDROID_CLIENT_ID) {
+        validAudiences.push(process.env.GOOGLE_ANDROID_CLIENT_ID);
+      }
+      if (process.env.GOOGLE_IOS_CLIENT_ID) {
+        validAudiences.push(process.env.GOOGLE_IOS_CLIENT_ID);
+      }
+
+      const client = new OAuth2Client();
       const ticket = await client.verifyIdToken({
         idToken: parsed.data.idToken,
-        audience: googleClientId,
+        audience: validAudiences,
       });
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {

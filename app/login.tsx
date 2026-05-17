@@ -22,7 +22,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function LoginScreen() {
   const { login, loginWithGoogle } = useAuth();
-  const { request, response: googleResponse, promptAsync } = useGoogleAuth();
+  const { request, response: googleResponse, promptAsync, idToken } = useGoogleAuth();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,23 +36,40 @@ export default function LoginScreen() {
   };
 
   useEffect(() => {
-    if (googleResponse?.type === "error") {
-      showError(googleResponse.error?.message || "Erro ao entrar com Google");
-      return;
-    }
-    if (googleResponse?.type !== "success") return;
+    if (!googleResponse) return;
 
-    const idToken = googleResponse.params?.id_token;
-    if (!idToken) {
-      showError("Token Google não encontrado");
+    if (googleResponse.type === "dismiss" || googleResponse.type === "cancel") {
+      // User closed the browser intentionally — do nothing
       return;
     }
+
+    if (googleResponse.type === "error") {
+      const msg = googleResponse.error?.message ?? "Erro ao entrar com Google";
+      console.warn("[GoogleAuth] error response:", googleResponse.error);
+      showError(msg);
+      return;
+    }
+
+    if (googleResponse.type !== "success") return;
+
+    // id_token is available after:
+    //   • web  → IdToken implicit flow → params.id_token
+    //   • native → Code+PKCE auto-exchange → authentication.idToken (also mirrored to params.id_token by the library)
+    if (!idToken) {
+      console.warn("[GoogleAuth] success response but no id_token found:", googleResponse);
+      showError("Token Google não encontrado. Tente novamente.");
+      return;
+    }
+
     setGoogleLoading(true);
     loginWithGoogle(idToken)
       .then(() => router.replace("/(tabs)"))
-      .catch((err: any) => showError(err.message || "Falha ao entrar com Google"))
+      .catch((err: any) => {
+        console.error("[GoogleAuth] backend validation failed:", err);
+        showError(err.message || "Falha ao entrar com Google");
+      })
       .finally(() => setGoogleLoading(false));
-  }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [googleResponse, idToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
