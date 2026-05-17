@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -17,12 +17,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { useGoogleAuth } from "@/lib/google-auth";
+import { signInWithGoogle } from "@/lib/google-auth";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function LoginScreen() {
   const { login, loginWithGoogle } = useAuth();
-  const { request, response: googleResponse, promptAsync, idToken } = useGoogleAuth();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,41 +34,22 @@ export default function LoginScreen() {
     setDialog({ title: "Não foi possível entrar", message });
   };
 
-  useEffect(() => {
-    if (!googleResponse) return;
-
-    if (googleResponse.type === "dismiss" || googleResponse.type === "cancel") {
-      // User closed the browser intentionally — do nothing
-      return;
-    }
-
-    if (googleResponse.type === "error") {
-      const msg = googleResponse.error?.message ?? "Erro ao entrar com Google";
-      console.warn("[GoogleAuth] error response:", googleResponse.error);
-      showError(msg);
-      return;
-    }
-
-    if (googleResponse.type !== "success") return;
-
-    // id_token is available after:
-    //   • web  → IdToken implicit flow → params.id_token
-    //   • native → Code+PKCE auto-exchange → authentication.idToken (also mirrored to params.id_token by the library)
-    if (!idToken) {
-      console.warn("[GoogleAuth] success response but no id_token found:", googleResponse);
-      showError("Token Google não encontrado. Tente novamente.");
-      return;
-    }
-
+  async function handleGoogleLogin() {
     setGoogleLoading(true);
-    loginWithGoogle(idToken)
-      .then(() => router.replace("/(tabs)"))
-      .catch((err: any) => {
-        console.error("[GoogleAuth] backend validation failed:", err);
-        showError(err.message || "Falha ao entrar com Google");
-      })
-      .finally(() => setGoogleLoading(false));
-  }, [googleResponse, idToken]); // eslint-disable-line react-hooks/exhaustive-deps
+    try {
+      const idToken = await signInWithGoogle();
+      if (!idToken) {
+        showError("Não foi possível obter as credenciais do Google");
+        return;
+      }
+      await loginWithGoogle(idToken);
+      router.replace("/(tabs)");
+    } catch (err: any) {
+      showError(err.message || "Falha ao entrar com Google");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -178,10 +158,10 @@ export default function LoginScreen() {
             style={({ pressed }) => [
               styles.googleBtn,
               pressed && styles.btnPressed,
-              (googleLoading || !request) && styles.btnDisabled,
+              googleLoading && styles.btnDisabled,
             ]}
-            onPress={() => promptAsync()}
-            disabled={googleLoading || !request}
+            onPress={() => handleGoogleLogin()}
+            disabled={googleLoading}
           >
             {googleLoading ? (
               <ActivityIndicator color={Colors.light.text} />

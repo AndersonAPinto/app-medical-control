@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { useGoogleAuth } from "@/lib/google-auth";
+import { signInWithGoogle } from "@/lib/google-auth";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 const roles = [
@@ -27,7 +27,6 @@ const roles = [
 
 export default function RegisterScreen() {
   const { register, loginWithGoogle } = useAuth();
-  const { request, response: googleResponse, promptAsync, idToken } = useGoogleAuth();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -41,38 +40,12 @@ export default function RegisterScreen() {
     setDialog({ title: "Não foi possível cadastrar", message });
   };
 
-  useEffect(() => {
-    if (!googleResponse) return;
-
-    if (googleResponse.type === "dismiss" || googleResponse.type === "cancel") {
-      return;
+  async function handleGoogleLogin() {
+    const idToken = await signInWithGoogle();
+    if (idToken) {
+      await loginWithGoogle(idToken, role);
     }
-
-    if (googleResponse.type === "error") {
-      const msg = googleResponse.error?.message ?? "Erro ao entrar com Google";
-      console.warn("[GoogleAuth] error response:", googleResponse.error);
-      showError(msg);
-      return;
-    }
-
-    if (googleResponse.type !== "success") return;
-
-    if (!idToken) {
-      console.warn("[GoogleAuth] success response but no id_token found:", googleResponse);
-      showError("Token Google não encontrado. Tente novamente.");
-      return;
-    }
-
-    setGoogleLoading(true);
-    // Pass the selected role so the backend creates the account with the right profile
-    loginWithGoogle(idToken, role)
-      .then(() => router.replace("/(tabs)"))
-      .catch((err: any) => {
-        console.error("[GoogleAuth] backend validation failed:", err);
-        showError(err.message || "Falha ao criar conta com Google");
-      })
-      .finally(() => setGoogleLoading(false));
-  }, [googleResponse, idToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
@@ -196,10 +169,10 @@ export default function RegisterScreen() {
             style={({ pressed }) => [
               styles.googleBtn,
               pressed && styles.btnPressed,
-              (googleLoading || !request) && styles.btnDisabled,
+              googleLoading && styles.btnDisabled,
             ]}
-            onPress={() => promptAsync()}
-            disabled={googleLoading || !request}
+            onPress={() => handleGoogleLogin()}
+            disabled={googleLoading}
           >
             {googleLoading ? (
               <ActivityIndicator color={Colors.light.text} />
