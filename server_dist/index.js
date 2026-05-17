@@ -240,7 +240,8 @@ var DatabaseStorage = class {
   }
   async registerPushToken(userId, token) {
     const [existing] = await db.select().from(pushTokens).where(and(eq(pushTokens.userId, userId), eq(pushTokens.token, token)));
-    if (existing) return existing;
+    if (existing)
+      return existing;
     const [created] = await db.insert(pushTokens).values({ userId, token }).returning();
     return created;
   }
@@ -263,7 +264,8 @@ var DatabaseStorage = class {
   }
   async getPasswordResetByCode(code) {
     const [row] = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.code, code));
-    if (!row) return void 0;
+    if (!row)
+      return void 0;
     return { id: row.id, userId: row.userId, expiresAt: row.expiresAt };
   }
   async deletePasswordResetCode(id) {
@@ -279,7 +281,8 @@ var DatabaseStorage = class {
     for (const conn of acceptedConns) {
       try {
         const user = await this.getUserById(conn.dependentId);
-        if (user) dependents.push(user);
+        if (user)
+          dependents.push(user);
       } catch (err) {
         console.error(`Failed to fetch dependent ${conn.dependentId}:`, err);
       }
@@ -300,11 +303,13 @@ function isExpoToken(token) {
   return token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken[");
 }
 async function sendPushToUsers(userIds, payload) {
-  if (userIds.length === 0) return;
+  if (userIds.length === 0)
+    return;
   const uniqueUserIds = Array.from(new Set(userIds));
   const tokenLists = await Promise.all(uniqueUserIds.map((userId) => storage.getPushTokensByUser(userId)));
   const tokens = tokenLists.flat().map((entry) => entry.token).filter(isExpoToken);
-  if (tokens.length === 0) return;
+  if (tokens.length === 0)
+    return;
   const messages = tokens.map((token) => ({
     to: token,
     sound: "default",
@@ -330,10 +335,12 @@ async function sendPushToUsers(userIds, payload) {
     const items = result.data || [];
     await Promise.all(
       items.map(async (item, index) => {
-        if (item.status !== "error") return;
+        if (item.status !== "error")
+          return;
         const errorCode = item.details?.error;
         const token = messages[index]?.to;
-        if (!token) return;
+        if (!token)
+          return;
         if (errorCode === "DeviceNotRegistered") {
           await storage.deletePushToken(token);
           return;
@@ -355,8 +362,10 @@ function requireAuth(req, res, next) {
 }
 var REVENUECAT_ENTITLEMENT_ID = process.env.REVENUECAT_ENTITLEMENT_ID || "premium";
 function toDateOrNull(value) {
-  if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (!value)
+    return null;
+  if (value instanceof Date)
+    return Number.isNaN(value.getTime()) ? null : value;
   if (typeof value === "number") {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
@@ -368,8 +377,10 @@ function toDateOrNull(value) {
   return null;
 }
 function inferInterval(productId, preferred) {
-  if (preferred === "monthly" || preferred === "yearly") return preferred;
-  if (!productId) return null;
+  if (preferred === "monthly" || preferred === "yearly")
+    return preferred;
+  if (!productId)
+    return null;
   const normalized = productId.toLowerCase();
   if (normalized.includes("year") || normalized.includes("annual") || normalized.includes("ano") || normalized.includes("anual")) {
     return "yearly";
@@ -408,7 +419,8 @@ async function createInAppAndPushNotification(params) {
   });
 }
 function resolvePlanTypeFromSubscription(isActiveNow, expiresAt) {
-  if (isActiveNow || hasFutureExpiry(expiresAt)) return "PREMIUM";
+  if (isActiveNow || hasFutureExpiry(expiresAt))
+    return "PREMIUM";
   return "FREE";
 }
 async function registerRoutes(app2) {
@@ -508,10 +520,17 @@ async function registerRoutes(app2) {
       if (!googleClientId) {
         return res.status(500).json({ message: "Google auth not configured" });
       }
-      const client = new OAuth2Client(googleClientId);
+      const validAudiences = [googleClientId];
+      if (process.env.GOOGLE_ANDROID_CLIENT_ID) {
+        validAudiences.push(process.env.GOOGLE_ANDROID_CLIENT_ID);
+      }
+      if (process.env.GOOGLE_IOS_CLIENT_ID) {
+        validAudiences.push(process.env.GOOGLE_IOS_CLIENT_ID);
+      }
+      const client = new OAuth2Client();
       const ticket = await client.verifyIdToken({
         idToken: parsed.data.idToken,
-        audience: googleClientId
+        audience: validAudiences
       });
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {
@@ -619,7 +638,8 @@ async function registerRoutes(app2) {
         return res.status(400).json({ message: "Email inv\xE1lido" });
       }
       const user = await storage.getUserByEmail(email.trim().toLowerCase());
-      if (!user) return res.json({ message: "Se o email existir, um c\xF3digo ser\xE1 enviado." });
+      if (!user)
+        return res.json({ message: "Se o email existir, um c\xF3digo ser\xE1 enviado." });
       await storage.deleteExpiredPasswordResetCodes();
       const code = String(Math.floor(1e5 + Math.random() * 9e5));
       const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
@@ -653,7 +673,8 @@ async function registerRoutes(app2) {
         return res.status(400).json({ message: "C\xF3digo e senha (m\xEDnimo 6 caracteres) s\xE3o obrigat\xF3rios" });
       }
       const record = await storage.getPasswordResetByCode(String(code));
-      if (!record) return res.status(400).json({ message: "C\xF3digo inv\xE1lido ou expirado" });
+      if (!record)
+        return res.status(400).json({ message: "C\xF3digo inv\xE1lido ou expirado" });
       if (record.expiresAt < /* @__PURE__ */ new Date()) {
         await storage.deletePasswordResetCode(record.id);
         return res.status(400).json({ message: "C\xF3digo expirado" });
@@ -1097,7 +1118,8 @@ async function registerRoutes(app2) {
   app2.get("/api/connections", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId);
-      if (!user) return res.status(401).json({ message: "User not found" });
+      if (!user)
+        return res.status(401).json({ message: "User not found" });
       if (user.role === "MASTER") {
         const conns = await storage.getConnectionsByMaster(req.session.userId);
         const enriched = [];
@@ -1133,7 +1155,8 @@ async function registerRoutes(app2) {
   app2.post("/api/connections", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId);
-      if (!user) return res.status(401).json({ message: "User not found" });
+      if (!user)
+        return res.status(401).json({ message: "User not found" });
       if (user.role !== "MASTER") {
         return res.status(403).json({ message: "Only MASTER users can add connections" });
       }
@@ -1386,14 +1409,17 @@ async function getMastersAndControllersForDependent(dependentId) {
 }
 async function processMedicationCycle(medicationId) {
   const medication = await storage.getMedicationById(medicationId);
-  if (!medication) return;
+  if (!medication)
+    return;
   const schedules = await storage.getSchedulesByOwner(medication.ownerId);
   const medSchedules = schedules.filter((schedule) => schedule.medId === medication.id).sort((a, b) => b.timeMillis - a.timeMillis);
   const lastTaken = medSchedules.find((schedule) => schedule.status === "TAKEN");
-  if (!lastTaken) return;
+  if (!lastTaken)
+    return;
   const now = Date.now();
   const dueTime = getDueTime(lastTaken.timeMillis, medication.intervalInHours);
-  if (dueTime > now) return;
+  if (dueTime > now)
+    return;
   const duePending = medSchedules.find((schedule) => schedule.status === "PENDING" && schedule.timeMillis === dueTime);
   const dueMissed = medSchedules.find((schedule) => schedule.status === "MISSED" && schedule.timeMillis === dueTime);
   if (!duePending && !dueMissed) {
@@ -1418,13 +1444,17 @@ async function processMedicationCycle(medicationId) {
     });
     return;
   }
-  if (!duePending) return;
-  if (now < dueTime + MISSED_GRACE_MS) return;
+  if (!duePending)
+    return;
+  if (now < dueTime + MISSED_GRACE_MS)
+    return;
   await storage.updateScheduleStatus(duePending.id, "MISSED");
   const dependent = await storage.getUserById(medication.ownerId);
-  if (!dependent || dependent.role !== "DEPENDENT") return;
+  if (!dependent || dependent.role !== "DEPENDENT")
+    return;
   const recipients = await getMastersAndControllersForDependent(dependent.id);
-  if (recipients.length === 0) return;
+  if (recipients.length === 0)
+    return;
   const title = "Dose em atraso";
   const message = `${dependent.name}: dose de ${medication.name} em atraso.`;
   await Promise.all(
@@ -1455,7 +1485,8 @@ async function runDoseMonitorCycle() {
   }
 }
 function startDoseMonitor() {
-  if (monitorHandle) return;
+  if (monitorHandle)
+    return;
   runDoseMonitorCycle().catch((error) => {
     console.error("Dose monitor initial cycle error:", error);
   });
@@ -1533,7 +1564,8 @@ function setupRequestLogging(app2) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
     res.on("finish", () => {
-      if (!path2.startsWith("/api")) return;
+      if (!path2.startsWith("/api"))
+        return;
       const duration = Date.now() - start;
       let logLine = `${req.method} ${path2} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
