@@ -8,6 +8,9 @@ GoogleSignin.configure({
 export async function signInWithGoogle(): Promise<string | null> {
   try {
     await GoogleSignin.hasPlayServices();
+    try {
+      await GoogleSignin.signOut();
+    } catch {}
     const response = await GoogleSignin.signIn();
     return response.data?.idToken ?? null;
   } catch (error) {
